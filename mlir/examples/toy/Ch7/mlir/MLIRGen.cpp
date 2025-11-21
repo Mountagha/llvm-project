@@ -524,6 +524,16 @@ private:
       }
       return builder.create<TransposeOp>(location, operands[0]);
     }
+    
+    if (callee == "neg") {
+      if (call.getArgs().size() != 1) {
+        emitError(location, "MLIR codegen encountered an error: toy.neg "
+                            "does not accept multiple arguments");
+        return nullptr;
+      }
+      mlir::Value input = operands[0];
+      return builder.create<NegOp>(location, input.getType(), input);
+    }
 
     // Otherwise this is a call to a user-defined function. Calls to
     // user-defined functions are mapped to a custom call that takes the callee

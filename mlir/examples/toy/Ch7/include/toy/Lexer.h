@@ -37,6 +37,7 @@ enum Token : int {
   tok_bracket_close = '}',
   tok_sbracket_open = '[',
   tok_sbracket_close = ']',
+  token_hyphen = '-',
 
   tok_eof = -1,
 
@@ -150,6 +151,29 @@ private:
       if (identifierStr == "var")
         return tok_var;
       return tok_identifier;
+    }
+
+      // Handle negative numbers: -[0-9]([0-9.])*
+    if (lastChar == '-') {
+      int nextChar = getNextChar();
+
+      if (isdigit(nextChar)) {
+        std::string numStr;
+        numStr += '-';
+        do {
+          numStr += nextChar;
+          nextChar = getNextChar();
+        } while (isdigit(nextChar) || nextChar == '.');
+
+        // Put back the lookahead.
+        lastChar = Token(nextChar);
+
+        numVal = strtod(numStr.c_str(), nullptr);
+        return tok_number;
+      }
+
+      // Not a negative number, just return '-' as a token.
+      return token_hyphen;
     }
 
     // Number: [0-9] ([0-9.])*

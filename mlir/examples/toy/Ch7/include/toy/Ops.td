@@ -456,16 +456,22 @@ def TransposeOp : Toy_Op<"transpose",
   let hasVerifier = 1;
 }
 
-def NegOP : Toy_Op<"neg", [Pure]> {
-  let summary = "elementwise negation"
+def NegOp : Toy_Op<"neg", [Pure]> {
+  let summary = "elementwise negation";
   let description = [{
-    Negates each element of the input tensor: output = -input
+    Negates each element of the input tensor: output = -input.
   }];
 
   let arguments = (ins F64Tensor:$input);
-  let results = (outs AnyTensor:$output);
+  let results = (outs F64Tensor:$output);
 
-  let assemblyFormat = "$input attr-dict";
+  // Allow building a NegOp with from the input operand.
+  //let builders = [
+  //  OpBuilder<(ins "Value":$input)>
+  //];
+
+  //   toy.neg %x : tensor<...xf64> -> tensor<...xf64>
+  let assemblyFormat = "$input attr-dict `:` type($input) `->` type($output)";
 }
 
 #endif // TOY_OPS
