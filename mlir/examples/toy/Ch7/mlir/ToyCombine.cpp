@@ -73,6 +73,26 @@ struct SimplifyRedundantTranspose : public mlir::OpRewritePattern<TransposeOp> {
   }
 };
 
+/// Fold neg(neg(x)) -> x
+struct SimplifyRedundantNeg : public mlir::OpRewritePattern<NegOp> {
+  SimplifyRedundantNeg(mlir::MLIRContext *context)
+    : OpRewritePattern<NegOp>(context, /*benefit=1*/1) {}
+  
+    llvm::LogicalResult
+    matchAndRewrite(NegOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+      mlir::Value innerNeg = op.getInput().getDefiningOp<toy::NegOp>();
+      if(!innerNeg) {
+        return mlir::failure();
+      }
+      
+      // neg(neg(x)) -> x
+      rewriter.replaceOp(op, innerNeg.getInput());
+      return mlir::success();
+
+    }
+};
+
 /// Register our patterns as "canonicalization" patterns on the TransposeOp so
 /// that they can be picked up by the Canonicalization framework.
 void TransposeOp::getCanonicalizationPatterns(RewritePatternSet &results,
@@ -87,3 +107,12 @@ void ReshapeOp::getCanonicalizationPatterns(RewritePatternSet &results,
   results.add<ReshapeReshapeOptPattern, RedundantReshapeOptPattern,
               FoldConstantReshapeOptPattern>(context);
 }
+
+/// Register our patterns as "canonicalization" patterns on the ReshapeOp so
+/// that they can be picked up by the Canonicalization framework.
+void NegOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                        MLIRContext *context) {
+  results.add<SimplifyRedundantNeg>(context)
+}
+
+

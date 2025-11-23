@@ -472,6 +472,9 @@ def NegOp : Toy_Op<"neg", [Pure]> {
 
   //   toy.neg %x : tensor<...xf64> -> tensor<...xf64>
   let assemblyFormat = "$input attr-dict `:` type($input) `->` type($output)";
+
+  // Enable registering canonicalization pattern with this operation
+  let hasVerifier = 1;
 }
 
 #endif // TOY_OPS
