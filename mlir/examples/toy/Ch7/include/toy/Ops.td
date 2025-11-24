@@ -474,7 +474,7 @@ def NegOp : Toy_Op<"neg", [Pure]> {
   let assemblyFormat = "$input attr-dict `:` type($input) `->` type($output)";
 
   // Enable registering canonicalization pattern with this operation
-  let hasVerifier = 1;
+  let hasCanonicalizer = 1;
 }
 
 #endif // TOY_OPS

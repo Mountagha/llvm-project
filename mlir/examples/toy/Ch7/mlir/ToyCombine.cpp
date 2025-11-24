@@ -81,7 +81,7 @@ struct SimplifyRedundantNeg : public mlir::OpRewritePattern<NegOp> {
     llvm::LogicalResult
     matchAndRewrite(NegOp op,
                   mlir::PatternRewriter &rewriter) const override {
-      mlir::Value innerNeg = op.getInput().getDefiningOp<toy::NegOp>();
+      NegOp innerNeg = op.getInput().getDefiningOp<toy::NegOp>();
       if(!innerNeg) {
         return mlir::failure();
       }
@@ -112,7 +112,7 @@ void ReshapeOp::getCanonicalizationPatterns(RewritePatternSet &results,
 /// that they can be picked up by the Canonicalization framework.
 void NegOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                         MLIRContext *context) {
-  results.add<SimplifyRedundantNeg>(context)
+  results.add<SimplifyRedundantNeg>(context);
 }
 
 

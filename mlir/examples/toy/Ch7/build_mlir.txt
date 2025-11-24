@@ -1,0 +1,5 @@
+cmake -G Ninja 
+    -DLLVM_ENABLE_PROJECTS=mlir
+    -DLLVM_ENABLE_EXAMPLES=ON       
+    -DCMAKE_BUILD_TYPE=Debug       
+    ../llvm
