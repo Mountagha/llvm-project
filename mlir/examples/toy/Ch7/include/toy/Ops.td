@@ -477,4 +477,22 @@ def NegOp : Toy_Op<"neg", [Pure]> {
   let hasCanonicalizer = 1;
 }
 
+def MaxOp : Toy_Op<"max", [Pure]> {
+  let summary = "elementwise maximum";
+  let description = [{
+    Computes the elementwise maximum of two tensors of the same type and shape.
+  }];
+
+  let arguments = (ins F64Tensor:$lhs, F64Tensor:$rhs);
+  let results = (outs F64Tensor:$result);
+
+  // Allow building a MaxOP with only the 2 inputs tensors
+  let builders = [
+    OpBuilder<(ins "Value":$lhs, "Value":$rhs)>
+  ];
+
+  // Simple assembly format: "toy.max %lhs, %rhs"
+  //let assemblyFormat = "$lhs `,` $rhs attr-dict `:` type($lhs) `->` type($result)";
+}
+
 #endif // TOY_OPS

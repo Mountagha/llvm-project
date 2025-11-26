@@ -535,6 +535,15 @@ private:
       return builder.create<NegOp>(location, input.getType(), input);
     }
 
+    if (callee == "max") {
+      if (call.getArgs().size() != 2) {
+        emitError(location, "MLIR codegen encountered an error: toy.max "
+                            "takes exactly two arguments");
+        return nullptr;
+      }
+      return builder.create<MaxOp>(location, operands[0], operands[1]);
+    }
+
     // Otherwise this is a call to a user-defined function. Calls to
     // user-defined functions are mapped to a custom call that takes the callee
     // name as an attribute.
