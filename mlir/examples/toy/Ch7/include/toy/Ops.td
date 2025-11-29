@@ -487,12 +487,13 @@ def MaxOp : Toy_Op<"max", [Pure]> {
   let results = (outs F64Tensor:$result);
 
   // Allow building a MaxOP with only the 2 inputs tensors
-  let builders = [
-    OpBuilder<(ins "Value":$lhs, "Value":$rhs)>
-  ];
+  //let builders = [
+  //  OpBuilder<(ins "Value":$lhs, "Value":$rhs)>
+  //];
 
   // Simple assembly format: "toy.max %lhs, %rhs"
   //let assemblyFormat = "$lhs `,` $rhs attr-dict `:` type($lhs) `->` type($result)";
+  let hasCanonicalizer = 1;
 }
 
 #endif // TOY_OPS

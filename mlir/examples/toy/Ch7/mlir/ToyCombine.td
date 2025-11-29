@@ -60,4 +60,12 @@ def RedundantReshapeOptPattern : Pat<
   (ReshapeOp:$res $arg), (replaceWithValue $arg),
   [(TypesAreIdentical $res, $arg)]>;
 
+// Max(x, x) = x
+//def MaxSameOperandOpt : Pat<
+  // Match: toy.max %x, %x
+//  (MaxOp:$op $x, $x),
+  // Replace all uses of the matched op with %x.
+//  (replaceWithValue $x)
+//>;
+
 #endif // TOY_COMBINE

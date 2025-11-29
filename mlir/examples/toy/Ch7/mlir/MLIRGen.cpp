@@ -541,7 +541,9 @@ private:
                             "takes exactly two arguments");
         return nullptr;
       }
-      return builder.create<MaxOp>(location, operands[0], operands[1]);
+      mlir::ValueRange inputs{operands[0], operands[1]};
+      mlir::Type resultType = operands[0].getType();
+      return builder.create<MaxOp>(location, resultType, inputs);
     }
 
     // Otherwise this is a call to a user-defined function. Calls to
