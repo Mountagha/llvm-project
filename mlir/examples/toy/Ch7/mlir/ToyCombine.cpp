@@ -95,13 +95,13 @@ struct SimplifyRedundantNeg : public mlir::OpRewritePattern<NegOp> {
 /// Max(x, x) -> x
 struct SimplifyMax : public mlir::OpRewritePattern<MaxOp> {
   SimplifyMax(mlir::MLIRContext* context)
-    : OpRewritePattern<NegOp>(context, /*benefit=*/1) {}
+    : OpRewritePattern<MaxOp>(context, /*benefit=*/1) {}
 
   llvm::LogicalResult
   matchAndRewrite(MaxOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    mlir::Value lhs = getLhs();
-    mlir::Value rhs = getRhs();
+    mlir::Value lhs = op.getLhs();
+    mlir::Value rhs = op.getRhs();
     if (lhs != rhs) {
       return failure();
     }  
@@ -136,6 +136,6 @@ void NegOp::getCanonicalizationPatterns(RewritePatternSet &results,
 /// that they can be picked up by the Canonicalization framework.
 void MaxOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                         MLIRContext *context) {
-  results.add<SimplifyRedundantNeg>(context);
+  results.add<SimplifyMax>(context);
 }
 

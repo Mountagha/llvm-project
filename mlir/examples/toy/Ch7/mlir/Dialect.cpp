@@ -497,6 +497,30 @@ llvm::LogicalResult TransposeOp::verify() {
   return mlir::success();
 }
 
+// Max Op
+llvm::LogicalResult MaxOp::verify() {
+  auto lhsType = llvm::dyn_cast<RankedTensorType>(getLhs().getType());
+  auto rhsType = llvm::dyn_cast<RankedTensorType>(getRhs().getType());
+  auto resType = llvm::dyn_cast<RankedTensorType>(getResult().getType());
+
+  // Require ranked tensors for all operands/result.
+  if (!lhsType || !rhsType || !resType) 
+    return emitOpError("requires ranked tensor operands and results");
+
+  // lhs and rhs must have exactly the same type (shape + element type).
+  if (lhsType != rhsType) {
+    return emitOpError("requires all operands to have the same type, got ")
+      << lhsType << " and " << rhsType;
+  }
+
+  // result type must match operands type as well
+  if (resType != lhsType)  {
+    return emitOpError("requires result type to match operands type, got")
+        << resType << " expects " << lhsType;
+  }
+  return success();
+}
+
 //===----------------------------------------------------------------------===//
 // Toy Types
 //===----------------------------------------------------------------------===//

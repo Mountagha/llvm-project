@@ -494,6 +494,7 @@ def MaxOp : Toy_Op<"max", [Pure]> {
   // Simple assembly format: "toy.max %lhs, %rhs"
   //let assemblyFormat = "$lhs `,` $rhs attr-dict `:` type($lhs) `->` type($result)";
   let hasCanonicalizer = 1;
+  let hasVerifier = 1;
 }
 
 #endif // TOY_OPS

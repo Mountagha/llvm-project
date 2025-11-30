@@ -1,4 +1,6 @@
 def main() {
     var a = [[1.0, -2.0], [3.0, -4.0]];
-    return neg(a);
+    var b = neg(a);
+    print(b);
+    return;
 }
