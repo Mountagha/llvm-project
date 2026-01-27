@@ -497,4 +497,18 @@ def MaxOp : Toy_Op<"max", [Pure]> {
   let hasVerifier = 1;
 }
 
+def ReluOp : Toy_Op<"relu", [Pure]> {
+  let summary = "relu operation";
+  let description = [{
+    Compute the relu operation of a tensor i.e max(x, 0)
+  }];
+
+  // Builder.
+  //let builders = [
+  //  OpBuilder<(ins "Value":$v)>
+  //];
+
+  let hasCanonicalizer = 1;
+  let hasVerifier = 0;
+}
 #endif // TOY_OPS
