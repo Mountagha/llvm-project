@@ -18,6 +18,7 @@ include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/CastInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
+include "mlir/Interfaces/InferTypeOpInterface.td"
 include "toy/ShapeInferenceInterface.td"
 
 // Provide a definition of the 'toy' dialect in the ODS framework so that we
@@ -456,7 +457,7 @@ def TransposeOp : Toy_Op<"transpose",
   let hasVerifier = 1;
 }
 
-def NegOp : Toy_Op<"neg", [Pure]> {
+def NegOp : Toy_Op<"neg", [Pure, SameOperandsAndResultType]> {
   let summary = "elementwise negation";
   let description = [{
     Negates each element of the input tensor: output = -input.
@@ -471,13 +472,13 @@ def NegOp : Toy_Op<"neg", [Pure]> {
   //];
 
   //   toy.neg %x : tensor<...xf64> -> tensor<...xf64>
-  let assemblyFormat = "$input attr-dict `:` type($input) `->` type($output)";
+  let assemblyFormat = "$input attr-dict `:` type($input)"; // `->` type($output)";
 
   // Enable registering canonicalization pattern with this operation
   let hasCanonicalizer = 1;
 }
 
-def MaxOp : Toy_Op<"max", [Pure]> {
+def MaxOp : Toy_Op<"max",[Pure, DeclareOpInterfaceMethods<ShapeInferenceOpInterface>]> {
   let summary = "elementwise maximum";
   let description = [{
     Computes the elementwise maximum of two tensors of the same type and shape.
@@ -497,18 +498,21 @@ def MaxOp : Toy_Op<"max", [Pure]> {
   let hasVerifier = 1;
 }
 
-def ReluOp : Toy_Op<"relu", [Pure]> {
+def ReluOp : Toy_Op<"relu", [Pure, DeclareOpInterfaceMethods<ShapeInferenceOpInterface>]> {
   let summary = "relu operation";
   let description = [{
     Compute the relu operation of a tensor i.e max(x, 0)
   }];
+
+  let arguments = (ins F64Tensor:$input);
+  let results = (outs F64Tensor:$output);
 
   // Builder.
   //let builders = [
   //  OpBuilder<(ins "Value":$v)>
   //];
 
-  let hasCanonicalizer = 1;
-  let hasVerifier = 0;
+  //let hasCanonicalizer = 1;
+  //let hasVerifier = 0;
 }
 #endif // TOY_OPS

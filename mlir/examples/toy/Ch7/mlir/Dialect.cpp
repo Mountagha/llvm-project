@@ -12,6 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "toy/Dialect.h"
+#include "toy/utils.h"
 
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -285,6 +286,14 @@ void AddOp::print(mlir::OpAsmPrinter &p) { printBinaryOp(p, *this); }
 /// Infer the output shape of the AddOp, this is required by the shape inference
 /// interface.
 void AddOp::inferShapes() { getResult().setType(getLhs().getType()); }
+
+/// Infer the output shape of the MaxOp, this is required by the shape inference
+/// interface.
+void MaxOp::inferShapes()  { getResult().setType(getLhs().getType()); }
+
+/// Infer the output shape of the ReluOp, this is required by the shape inference
+/// interface.
+void ReluOp::inferShapes()  { getResult().setType(getInput().getType()); }
 
 //===----------------------------------------------------------------------===//
 // CastOp
