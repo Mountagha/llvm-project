@@ -515,4 +515,11 @@ def ReluOp : Toy_Op<"relu", [Pure, DeclareOpInterfaceMethods<ShapeInferenceOpInt
   //let hasCanonicalizer = 1;
   //let hasVerifier = 0;
 }
+
+def ReduceSum : Toy_Op<"reduce_sum", [Pure, DeclareOpInterfaceMethods<ShapeInferenceOpInterface>]> {
+  let summary = "reduce sum operation";
+  let description = [{
+    Reduce a tensor along a giving dimension.
+  }];
+}
 #endif // TOY_OPS
