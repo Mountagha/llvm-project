@@ -517,9 +517,22 @@ def ReluOp : Toy_Op<"relu", [Pure, DeclareOpInterfaceMethods<ShapeInferenceOpInt
 }
 
 def ReduceSum : Toy_Op<"reduce_sum", [Pure, DeclareOpInterfaceMethods<ShapeInferenceOpInterface>]> {
-  let summary = "reduce sum operation";
+  let summary = "sum reduce along a given axis";
   let description = [{
-    Reduce a tensor along a giving dimension.
+    Reduce a ranked tensor by summing along the specified dimension.
+
+    Example:
+      %0 = toy.reduce_sum %arg0 { axis = 1}: 
+            tensor<2x3x4xf64> -> tensor<2x4xf64>
   }];
+
+  let arguments = (ins F64Tensor:$input, I64Attr:$axis);
+  let results = (outs F64Tensor:$result);
+
+  let hasVerifier = 1;
+  let hasCanonicalizer = 1;
+
+  let assemblyFormat = "$input attr-dict `:` type($input) `->` type($result)";
 }
+
 #endif // TOY_OPS

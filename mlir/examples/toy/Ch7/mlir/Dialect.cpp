@@ -295,6 +295,15 @@ void MaxOp::inferShapes()  { getResult().setType(getLhs().getType()); }
 /// interface.
 void ReluOp::inferShapes()  { getResult().setType(getInput().getType()); }
 
+/// Infer the output shape of the ReduceSumOp, this is required by the shape inference
+/// interface.
+void ReduceSumOp::inferShapes() {
+  auto inputType = llvm::cast<RankedTensorType>(getInput().getType());
+  int64_t axis = getAxis();
+  SmallVector<int64_t> shape(inputType.getShape())
+  shape.erase(shape.begin() + axis);
+  getResult().setType(RankedTensorType::get(shape, inputType.getElementType()));
+}
 //===----------------------------------------------------------------------===//
 // CastOp
 //===----------------------------------------------------------------------===//

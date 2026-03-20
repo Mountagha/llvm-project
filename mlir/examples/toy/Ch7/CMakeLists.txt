@@ -20,6 +20,7 @@ add_public_tablegen_target(ToyCh7CombineIncGen)
 
 add_toy_chapter(toyc-ch7
   toyc.cpp
+  utils.cpp
   parser/AST.cpp
   mlir/MLIRGen.cpp
   mlir/Dialect.cpp
