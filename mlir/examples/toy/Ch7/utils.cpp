@@ -20,7 +20,7 @@
 using namespace mlir;
 using namespace toy;
 
-static mlir::FailureOr<llvm::SmallVector<int64_t>>
+mlir::FailureOr<llvm::SmallVector<int64_t>>
 computeBroadcastedShape(llvm::ArrayRef<int64_t> a,
                         llvm::ArrayRef<int64_t> b) {
     int ra = (int)a.size();
@@ -36,7 +36,7 @@ computeBroadcastedShape(llvm::ArrayRef<int64_t> a,
         // If you have dynamic dims in your Toy (often you don't in Ch7),
         // you'd need to handle ShapedType::kDynamic here. Otherwise omit.
         if (da != db && da != 1 && db != 1)
-            return mlir::failure;
+            return mlir::failure();
 
         out[r - 1 - i] = std::max(da, db);
 

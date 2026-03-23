@@ -556,6 +556,21 @@ private:
       return builder.create<ReluOp>(location, input.getType(), input);
     }
 
+    if (callee == "reduce_sum") {
+      if (call.getArgs().size() != 2) {
+        emitError(location, "toy.reduce_sum expects exactly 2 arguments (tensor axis)");
+        return nullptr;
+      }
+
+      mlir::Value input = operands[0];
+      auto axisConstant = operands[1].getDefiningOp<ConstantOp>()
+      int64_t axis = (int64_t)axisConstant.getValue()
+            .getSplatValue<llvm::APFloat>()
+            .convertToDouble();
+
+      return builder.create<ReduceSumOp>(location input, axis);
+    }
+
     // Otherwise this is a call to a user-defined function. Calls to
     // user-defined functions are mapped to a custom call that takes the callee
     // name as an attribute.

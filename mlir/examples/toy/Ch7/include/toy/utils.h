@@ -19,7 +19,7 @@
 namespace mlir {
 namespace toy {
 
-static mlir::FailureOr<llvm::SmallVector<int64_t>>
+mlir::FailureOr<llvm::SmallVector<int64_t>>
 computeBroadcastedShape(llvm::ArrayRef<int64_t> a, llvm::ArrayRef<int64_t> b);
 
 } // namespace toy
