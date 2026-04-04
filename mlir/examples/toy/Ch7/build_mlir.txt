@@ -3,3 +3,8 @@ cmake -G Ninja
     -DLLVM_ENABLE_EXAMPLES=ON       
     -DCMAKE_BUILD_TYPE=Debug       
     ../llvm
+
+
+    // running a filecheck test
+
+     ! ./bin/toyc-ch7 -x=mlir -emit=mlir /tmp/tests/rank_zero.mlir 2>&1 | FileCheck-20 ../mlir/examples/toy/Ch7/tests/reduce_sum.mlir --check-prefix=RANK-ZERO

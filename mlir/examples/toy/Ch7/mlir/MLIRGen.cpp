@@ -563,12 +563,25 @@ private:
       }
 
       mlir::Value input = operands[0];
-      auto axisConstant = operands[1].getDefiningOp<ConstantOp>()
+      auto axisConstant = operands[1].getDefiningOp<ConstantOp>();
       int64_t axis = (int64_t)axisConstant.getValue()
-            .getSplatValue<llvm::APFloat>()
-            .convertToDouble();
+                        .getSplatValue<llvm::APFloat>()
+                        .convertToDouble();
 
-      return builder.create<ReduceSumOp>(location input, axis);
+      auto inputType = llvm::dyn_cast<mlir::RankedTensorType>(input.getType());
+      if (!inputType) {
+        emitError(location, "toy.reduce_sum requires a ranked input tensor type.");
+        return nullptr;
+      }
+
+      // Compute result type
+      llvm::SmallVector<int64_t> resultShape (inputType.getShape().begin(),
+                                              inputType.getShape().end());
+      resultShape.erase(resultShape.begin() + axis);
+
+      auto resultType = mlir::RankedTensorType::get(resultShape, inputType.getElementType());
+
+      return builder.create<ReduceSumOp>(location, resultType, input, axis);
     }
 
     // Otherwise this is a call to a user-defined function. Calls to
