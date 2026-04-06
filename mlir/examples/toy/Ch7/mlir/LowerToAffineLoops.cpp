@@ -178,7 +178,7 @@ using NegOpLowering = UnaryOpLowering<toy::NegOp, arith::NegFOp>;
 using AddOpLowering = BinaryOpLowering<toy::AddOp, arith::AddFOp>;
 using MulOpLowering = BinaryOpLowering<toy::MulOp, arith::MulFOp>;
 using MaxOpLowering = BinaryOpLowering<toy::MaxOp, arith::MaximumFOp>;
-using NegOpLowering = UnaryOpLowering<toy::NegOp, arith::NegFOp>;
+//using NegOpLowering = UnaryOpLowering<toy::NegOp, arith::NegFOp>;
 
 //===----------------------------------------------------------------------===//
 // ToyToAffine RewritePatterns: Constant operations
@@ -347,6 +347,87 @@ struct TransposeOpLowering : public ConversionPattern {
     return success();
   }
 };
+//===----------------------------------------------------------------------===//
+// Helper function to initialize a given memref with 0.
+//===----------------------------------------------------------------------===//
+
+static void zeroInitMemref(Value memref, Location loc, PatternRewriter &rewriter) {
+  auto memRefType = llvm::cast<MemRefType>(memref.getType());
+  auto elementType = llvm::cast<FloatType>(memRefType.getElementType());
+  auto zeroAttr = rewriter.getFloatAttr(elementType, 0.0);
+  Value zero = rewriter.create<arith::ConstantOp>(loc, zeroAttr);
+
+  // Rank-0 memref: store the scalar directly. No need for a loop.
+  if (memRefType.getRank() == 0) {
+    rewriter.create<affine::AffineStoreOp>(loc, zero, memref, ValueRange{});
+    return;
+  }
+
+  SmallVector<int64_t, 4> lowerBounds(memRefType.getRank(), 0);
+  SmallVector<int64_t, 4> steps(memRefType.getRank(), 1);
+  affine::buildAffineLoopNest(
+    rewriter, loc, lowerBounds, memRefType.getShape(), steps,
+    [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange ivs) {
+      nestedBuilder.create<affine::AffineStoreOp>(nestedLoc, zero, memref, ivs);
+    }
+  );
+}
+
+//===----------------------------------------------------------------------===//
+// ToyToAffine RewritePatterns: Reduce sum op.
+//===----------------------------------------------------------------------===//
+
+struct ReduceSumOpLowering : public OpConversionPattern<toy::ReduceSumOp> {
+  using OpConversionPattern<toy::ReduceSumOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(toy::ReduceSumOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
+    
+    Location loc = op.getLoc();
+
+    Value input = adaptor.getInput();
+    auto inputMemRefType = llvm::cast<MemRefType>(input.getType());
+
+    auto resultTensorType = llvm::cast<RankedTensorType>(op.getResult().getType());
+    auto resultMemRefType = convertTensorToMemRef(resultTensorType);
+
+    Value alloc = insertAllocAndDealloc(resultMemRefType, loc, rewriter);
+
+    // Initialize the accumulation buffer.
+    zeroInitMemref(alloc, loc, rewriter);
+
+    int64_t axis = op.getAxis();
+
+    SmallVector<int64_t, 4> lowerBounds(inputMemRefType.getRank(), 0);
+    SmallVector<int64_t, 4> steps(inputMemRefType.getRank(), 1);
+
+    affine::buildAffineLoopNest(
+      rewriter, loc, lowerBounds, inputMemRefType.getShape(), steps,
+      [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange ivs) {
+        Value inputElement = nestedBuilder.create<affine::AffineLoadOp>(nestedLoc, input, ivs);
+
+        // Project input indices to output indices by dropping the reduced axis.
+        SmallVector<Value, 4> resultIvs;
+        resultIvs.reserve(ivs.size() - 1);
+        for (const auto& it : llvm::enumerate(ivs)) {
+          if (static_cast<int64_t>(it.index()) != axis)
+            resultIvs.push_back(it.value());
+        }
+
+        Value current = 
+              nestedBuilder.create<affine::AffineLoadOp>(nestedLoc, alloc, resultIvs);
+        Value updated = 
+              nestedBuilder.create<arith::AddFOp>(nestedLoc, current, inputElement);
+        nestedBuilder.create<affine::AffineStoreOp>(nestedLoc, updated, alloc, resultIvs);
+      }
+    );
+  
+  rewriter.replaceOp(op, alloc);
+  return success();
+  }
+};
+
 
 } // namespace
 
@@ -399,7 +480,7 @@ void ToyToAffineLoweringPass::runOnOperation() {
   // the set of patterns that will lower the Toy operations.
   RewritePatternSet patterns(&getContext());
   patterns.add<AddOpLowering, ConstantOpLowering, FuncOpLowering, MulOpLowering,
-               PrintOpLowering, ReturnOpLowering, TransposeOpLowering, MaxOpLowering, NegOpLowering>(
+               PrintOpLowering, ReturnOpLowering, TransposeOpLowering, MaxOpLowering, NegOpLowering, ReduceSumOpLowering>(
       &getContext());
 
   // With the target and rewrite patterns defined, we can now attempt the
