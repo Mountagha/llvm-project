@@ -39,6 +39,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <cassert>
 
 using namespace mlir;
 using namespace mlir::toy;
@@ -289,7 +290,18 @@ void AddOp::inferShapes() { getResult().setType(getLhs().getType()); }
 
 /// Infer the output shape of the MaxOp, this is required by the shape inference
 /// interface.
-void MaxOp::inferShapes()  { getResult().setType(getLhs().getType()); }
+void MaxOp::inferShapes()  { 
+  auto lhsType = llvm::dyn_cast<RankedTensorType>(getLhs().getType());
+  auto rhsType = llvm::dyn_cast<RankedTensorType>(getRhs().getType());
+
+  assert(lhsType && rhsType && "both max operands are required to be ranked tensors.");
+
+  auto inferredShape = computeBroadcastedShape(lhsType.getShape(), lhsType.getShape());
+  assert(succeeded(inferredShape) && "max operands are not broadcast compatibles.");
+
+  auto resultType = RankedTensorType::get(*inferredShape, lhsType.getElementType());
+  getResult().setType(resultType);
+}
 
 /// Infer the output shape of the ReluOp, this is required by the shape inference
 /// interface.
@@ -574,17 +586,16 @@ llvm::LogicalResult MaxOp::verify() {
   if (!lhsType || !rhsType || !resType) 
     return emitOpError("requires ranked tensor operands and results");
 
-  // lhs and rhs must have exactly the same type (shape + element type).
-  if (lhsType != rhsType) {
-    return emitOpError("requires all operands to have the same type, got ")
-      << lhsType << " and " << rhsType;
+  if (lhsType.getElementType() != rhsType.getElementType())
+    return emitOpError("expects same element type on both operands.");
+  
+  auto inferredShape = computeBroadcastedShape(lhsType.getShape(), rhsType.getShape());
+  if (failed(inferredShape)) {
+    return emitOpError("Operands are not broadcast-compatible.");
   }
 
-  // result type must match operands type as well
-  if (resType != lhsType)  {
-    return emitOpError("requires result type to match operands type, got")
-        << resType << " expects " << lhsType;
-  }
+  if (llvm::ArrayRef<int64_t>(*inferredShape) != resType.getShape())
+    return emitOpError("result type does not match broadcast shape.");
   return success();
 }
 

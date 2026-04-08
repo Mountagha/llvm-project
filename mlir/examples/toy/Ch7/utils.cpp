@@ -17,14 +17,14 @@
 #include "llvm/ADT/ArrayRef.h"
 #include <algorithm>
 
-using namespace mlir;
-using namespace toy;
+namespace mlir {
+namespace toy {
 
-mlir::FailureOr<llvm::SmallVector<int64_t>>
+FailureOr<llvm::SmallVector<int64_t>>
 computeBroadcastedShape(llvm::ArrayRef<int64_t> a,
-                        llvm::ArrayRef<int64_t> b) {
-    int ra = (int)a.size();
-    int rb = (int)b.size();
+                                                llvm::ArrayRef<int64_t> b) {
+    int ra = static_cast<int>(a.size());
+    int rb = static_cast<int>(b.size());
     int r = std::max(ra, rb);
 
     llvm::SmallVector<int64_t> out(r, 1);
@@ -33,13 +33,13 @@ computeBroadcastedShape(llvm::ArrayRef<int64_t> a,
         int64_t da = (i < ra) ? a[r - 1 - i] : 1;
         int64_t db = (i < rb) ? b[r - 1 - i] : 1;
 
-        // If you have dynamic dims in your Toy (often you don't in Ch7),
-        // you'd need to handle ShapedType::kDynamic here. Otherwise omit.
         if (da != db && da != 1 && db != 1)
             return mlir::failure();
 
         out[r - 1 - i] = std::max(da, db);
-
     }
     return out;
 }
+
+} // namespace toy
+} // namespace mlir
