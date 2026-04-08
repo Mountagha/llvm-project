@@ -296,7 +296,7 @@ void MaxOp::inferShapes()  {
 
   assert(lhsType && rhsType && "both max operands are required to be ranked tensors.");
 
-  auto inferredShape = computeBroadcastedShape(lhsType.getShape(), lhsType.getShape());
+  auto inferredShape = computeBroadcastedShape(lhsType.getShape(), rhsType.getShape());
   assert(succeeded(inferredShape) && "max operands are not broadcast compatibles.");
 
   auto resultType = RankedTensorType::get(*inferredShape, lhsType.getElementType());

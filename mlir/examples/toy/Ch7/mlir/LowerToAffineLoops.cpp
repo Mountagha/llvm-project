@@ -177,8 +177,6 @@ struct UnaryOpLowering : public ConversionPattern {
 using NegOpLowering = UnaryOpLowering<toy::NegOp, arith::NegFOp>;
 using AddOpLowering = BinaryOpLowering<toy::AddOp, arith::AddFOp>;
 using MulOpLowering = BinaryOpLowering<toy::MulOp, arith::MulFOp>;
-using MaxOpLowering = BinaryOpLowering<toy::MaxOp, arith::MaximumFOp>;
-//using NegOpLowering = UnaryOpLowering<toy::NegOp, arith::NegFOp>;
 
 //===----------------------------------------------------------------------===//
 // ToyToAffine RewritePatterns: Constant operations
@@ -347,6 +345,9 @@ struct TransposeOpLowering : public ConversionPattern {
     return success();
   }
 };
+
+} // namespace
+
 //===----------------------------------------------------------------------===//
 // Helper function to initialize a given memref with 0.
 //===----------------------------------------------------------------------===//
@@ -377,6 +378,7 @@ static void zeroInitMemref(Value memref, Location loc, PatternRewriter &rewriter
 // ToyToAffine RewritePatterns: Reduce sum op.
 //===----------------------------------------------------------------------===//
 
+namespace {
 struct ReduceSumOpLowering : public OpConversionPattern<toy::ReduceSumOp> {
   using OpConversionPattern<toy::ReduceSumOp>::OpConversionPattern;
 
@@ -428,6 +430,75 @@ struct ReduceSumOpLowering : public OpConversionPattern<toy::ReduceSumOp> {
   }
 };
 
+
+} // namespace
+
+static SmallVector<Value, 4> projectBroadcastIndices(
+  ArrayRef<int64_t> operandShape,
+  ArrayRef<int64_t> resultShape,
+  ValueRange resultIvs,
+  Location loc,
+  OpBuilder &builder) {
+  
+    SmallVector<Value, 4> projected;
+    int64_t operandRank = operandShape.size();
+    int64_t resultRank = resultShape.size();
+    int64_t rankOffset = resultRank - operandRank;
+    assert(operandRank <= resultRank && "rank of operand to project to must be less or equal to result rank.");
+    assert(resultIvs.size() == resultShape.size() && "resultIvs size must be equal to resultShape size");
+    
+    for (int64_t d = 0; d < operandRank; ++d) {
+      int64_t resultDim = d + rankOffset;
+      if (operandShape[d] == 1) {
+        projected.push_back(builder.create<arith::ConstantIndexOp>(loc, 0));
+      } else {
+        projected.push_back(resultIvs[resultDim]);
+      }
+    }
+    return projected;
+}
+
+namespace {
+struct MaxOpLowering : public OpConversionPattern<toy::MaxOp> {
+  using OpConversionPattern<toy::MaxOp>::OpConversionPattern;
+
+LogicalResult
+matchAndRewrite(toy::MaxOp op, OpAdaptor adaptor,
+                ConversionPatternRewriter &rewriter) const final {
+  
+  auto loc = op.getLoc();
+  auto lhs = adaptor.getLhs();
+  auto rhs = adaptor.getRhs(); 
+  auto lhsMemRefType = llvm::cast<MemRefType>(lhs.getType());
+  auto rhsMemRefType = llvm::cast<MemRefType>(rhs.getType());
+
+  auto resultTensorType = llvm::cast<RankedTensorType>(op.getResult().getType());
+  auto resMemRefType = convertTensorToMemRef(resultTensorType);
+
+  Value alloc = insertAllocAndDealloc(resMemRefType, loc, rewriter);
+
+  SmallVector<int64_t, 4> lowerBounds(resMemRefType.getRank(), 0);
+  SmallVector<int64_t, 4> steps(resMemRefType.getRank(), 1);
+
+  affine::buildAffineLoopNest(
+    rewriter, loc, lowerBounds, resMemRefType.getShape(), steps,
+    [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange ivs) {
+      
+      auto lhsIvs = projectBroadcastIndices(lhsMemRefType.getShape(), resMemRefType.getShape(), ivs, nestedLoc, nestedBuilder);
+      auto rhsIvs = projectBroadcastIndices(rhsMemRefType.getShape(), resMemRefType.getShape(), ivs, nestedLoc, nestedBuilder);
+      
+      auto loadedLhs = nestedBuilder.create<affine::AffineLoadOp>(nestedLoc, lhs, lhsIvs);
+      auto loadedRhs = nestedBuilder.create<affine::AffineLoadOp>(nestedLoc, rhs, rhsIvs);
+
+      auto maxVal = nestedBuilder.create<arith::MaximumFOp>(nestedLoc, loadedLhs, loadedRhs);
+      nestedBuilder.create<affine::AffineStoreOp>(nestedLoc, maxVal, alloc, ivs);
+    }
+  );
+
+  rewriter.replaceOp(op, alloc);
+  return success();
+}
+};
 
 } // namespace
 
