@@ -502,6 +502,52 @@ matchAndRewrite(toy::MaxOp op, OpAdaptor adaptor,
 
 } // namespace
 
+namespace {
+
+//===----------------------------------------------------------------------===//
+// ToyToAffine RewritePatterns: relu op
+//===----------------------------------------------------------------------===//
+
+struct ReluOpLowering: public OpConversionPattern<toy::ReluOp> {
+  using OpConversionPattern<toy::ReluOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(toy::ReluOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
+    Location loc = op.getLoc();
+    Value input = adaptor.getInput();
+    auto inputMemRefType = llvm::cast<MemRefType>(input.getType());
+
+    auto resultTensorType = llvm::cast<RankedTensorType>(op.getResult().getType());
+    auto resultMemRefType = convertTensorToMemRef(resultTensorType);
+
+    Value alloc = insertAllocAndDealloc(resultMemRefType, loc, rewriter);
+
+    SmallVector<int64_t, 4> lowerBounds(inputMemRefType.getRank(), 0);
+    SmallVector<int64_t, 4> steps(inputMemRefType.getRank(), 1);
+
+    auto elementType = llvm::cast<FloatType>(resultMemRefType.getElementType());
+    auto zeroAttr = rewriter.getFloatAttr(elementType, 0.0);
+    Value zero = rewriter.create<arith::ConstantOp>(loc, zeroAttr);
+
+    affine::buildAffineLoopNest(
+      rewriter, loc, lowerBounds, inputMemRefType.getShape(), steps,
+      [&](OpBuilder& nestedBuilder, Location nestedLoc, ValueRange ivs) {
+
+        Value loadedInput = nestedBuilder.create<affine::AffineLoadOp>(nestedLoc, input, ivs);
+        Value reluVal = nestedBuilder.create<arith::MaximumFOp>(nestedLoc, loadedInput, zero);
+        nestedBuilder.create<affine::AffineStoreOp>(nestedLoc, reluVal, alloc, ivs);
+
+      }
+    );
+
+    rewriter.replaceOp(op, alloc);
+    return success();
+  }
+  
+};
+
+} // namespace
 //===----------------------------------------------------------------------===//
 // ToyToAffineLoweringPass
 //===----------------------------------------------------------------------===//
@@ -551,7 +597,8 @@ void ToyToAffineLoweringPass::runOnOperation() {
   // the set of patterns that will lower the Toy operations.
   RewritePatternSet patterns(&getContext());
   patterns.add<AddOpLowering, ConstantOpLowering, FuncOpLowering, MulOpLowering,
-               PrintOpLowering, ReturnOpLowering, TransposeOpLowering, MaxOpLowering, NegOpLowering, ReduceSumOpLowering>(
+               PrintOpLowering, ReturnOpLowering, TransposeOpLowering, MaxOpLowering,
+               NegOpLowering, ReduceSumOpLowering, ReluOpLowering>(
       &getContext());
 
   // With the target and rewrite patterns defined, we can now attempt the

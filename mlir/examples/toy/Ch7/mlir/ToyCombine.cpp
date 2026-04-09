@@ -141,6 +141,27 @@ struct SimplifyRedundantTranspose : public mlir::OpRewritePattern<TransposeOp> {
   }
 };
 
+// Canonalize relu(relu(x)) -> relu(x)
+struct SimplifyNestedRelu: public mlir::OpRewritePattern<ReluOp> {
+  SimplifyNestedRelu(mlir::MLIRContext *context)
+    : OpRewritePattern<ReluOp>(context, /* benefit */1) {}
+
+  llvm::LogicalResult
+  matchAndRewrite(ReluOp op, mlir::PatternRewriter &rewriter) const override {
+    mlir::Value reluInput = op.getOperand();
+    ReluOp innerReluOp = reluInput.getDefiningOp<ReluOp>();
+
+    if (!innerReluOp) {
+      return failure();
+    }
+
+    // replace relu(relu(x)) by relu(x)
+    rewriter.replaceOp(op, innerReluOp);
+    return success();
+  }
+};
+
+
 /// Fold neg(neg(x)) -> x
 struct SimplifyRedundantNeg : public mlir::OpRewritePattern<NegOp> {
   SimplifyRedundantNeg(mlir::MLIRContext *context)
@@ -207,3 +228,9 @@ void MaxOp::getCanonicalizationPatterns(RewritePatternSet &results,
   results.add<SimplifyMax>(context);
 }
 
+/// Register our patterns as "canonicalization" patterns on the MaxOp so
+/// that they can be picked up by the Canonicalization framework.
+void ReluOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                        MLIRContext *context) {
+  results.add<SimplifyNestedRelu>(context);
+}

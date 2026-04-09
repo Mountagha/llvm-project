@@ -471,8 +471,8 @@ def NegOp : Toy_Op<"neg", [Pure, SameOperandsAndResultType]> {
   //  OpBuilder<(ins "Value":$input)>
   //];
 
-  //   toy.neg %x : tensor<...xf64> -> tensor<...xf64>
-  let assemblyFormat = "$input attr-dict `:` type($input)"; // `->` type($output)";
+  //   toy.neg %x : tensor<...xf64>
+  let assemblyFormat = "$input attr-dict `:` type($input)";
 
   // Enable registering canonicalization pattern with this operation
   let hasCanonicalizer = 1;
@@ -498,7 +498,7 @@ def MaxOp : Toy_Op<"max",[Pure, DeclareOpInterfaceMethods<ShapeInferenceOpInterf
   let hasVerifier = 1;
 }
 
-def ReluOp : Toy_Op<"relu", [Pure, DeclareOpInterfaceMethods<ShapeInferenceOpInterface>]> {
+def ReluOp : Toy_Op<"relu", [Pure, DeclareOpInterfaceMethods<ShapeInferenceOpInterface>, SameOperandsAndResultType]> {
   let summary = "relu operation";
   let description = [{
     Compute the relu operation of a tensor i.e max(x, 0)
@@ -512,7 +512,8 @@ def ReluOp : Toy_Op<"relu", [Pure, DeclareOpInterfaceMethods<ShapeInferenceOpInt
   //  OpBuilder<(ins "Value":$v)>
   //];
 
-  //let hasCanonicalizer = 1;
+  let assemblyFormat = "$input attr-dict `:` type($input)";
+  let hasCanonicalizer = 1;
   //let hasVerifier = 0;
 }
 
