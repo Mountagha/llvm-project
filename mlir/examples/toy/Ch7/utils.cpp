@@ -30,8 +30,8 @@ computeBroadcastedShape(llvm::ArrayRef<int64_t> a,
     llvm::SmallVector<int64_t> out(r, 1);
 
     for (int i = 0; i < r; ++i) {
-        int64_t da = (i < ra) ? a[r - 1 - i] : 1;
-        int64_t db = (i < rb) ? b[r - 1 - i] : 1;
+        int64_t da = (i < ra) ? a[ra - 1 - i] : 1;
+        int64_t db = (i < rb) ? b[rb - 1 - i] : 1;
 
         if (da != db && da != 1 && db != 1)
             return mlir::failure();
