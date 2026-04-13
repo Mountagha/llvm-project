@@ -364,6 +364,56 @@ void ReduceSumOp::inferShapes() {
   getResult().setType(RankedTensorType::get(shape, inputType.getElementType()));
 }
 
+//===----------------------------------------------------------------------===//
+// ReduceMaxOp
+//===----------------------------------------------------------------------===//
+llvm::LogicalResult ReduceMaxOp::verify() {
+  auto inputType = llvm::dyn_cast<mlir::RankedTensorType>(getInput().getType());
+  if (!inputType) {
+    return emitOpError("reduce_max requires a ranked tensor input");
+  }
+  int64_t axis = getAxis();
+  int64_t rank = inputType.getRank();
+
+  if (rank <= 0) 
+    return emitOpError("reduce_max expects a tensor with rank > 0.");
+
+  if (axis < 0 || axis >= rank)
+    return emitOpError() << "axis " << axis << "is out of bounds for tensor of rank" << rank;
+
+  auto resultType = llvm::dyn_cast<mlir::RankedTensorType>(getResult().getType());
+  if (!resultType)
+    return emitOpError("the result tensor must be a ranked tensor.");
+
+  if (resultType.getElementType() != inputType.getElementType()) {
+    return emitOpError("input and result must have the same element type.");
+  }
+
+  SmallVector<int64_t> expectedShape;
+  expectedShape.reserve(rank - 1);
+  for (int64_t i = 0; i < rank; ++i) {
+    if (axis != i) expectedShape.push_back(inputType.getDimSize(i));
+  }
+
+  auto expectedType = mlir::RankedTensorType::get(expectedShape, inputType.getElementType());
+  if (resultType != expectedType) {
+    return emitOpError()  << "has incorrect result type: expected "
+                          << expectedType << " but got " << resultType;
+  }
+
+  return mlir::success();
+}
+
+/// Infer the output shape of ReduceMaxOp. This is required by the shape interface.
+void ReduceMaxOp::inferShapes() {
+  auto inputType = llvm::cast<RankedTensorType>(getInput().getType());
+  int64_t axis = getAxis();
+
+  SmallVector<int64_t> shape(inputType.getShape());
+  shape.erase(shape.begin() + axis);
+  getResult().setType(RankedTensorType::get(shape, inputType.getElementType()));
+}
+
 
 //===----------------------------------------------------------------------===//
 // CastOp

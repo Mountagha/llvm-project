@@ -537,4 +537,24 @@ def ReduceSumOp : Toy_Op<"reduce_sum", [Pure, DeclareOpInterfaceMethods<ShapeInf
   let assemblyFormat = "$input attr-dict `:` type($input) `->` type($result)";
 }
 
+def ReduceMaxOp : Toy_Op<"reduce_max", [Pure, DeclareOpInterfaceMethods<ShapeInferenceOpInterface>]> {
+  let summary = "max reduce along a given axis";
+  let description = [{
+    Reduce a ranked tensor by taking the max value along the specified dimension.
+
+    Example:
+      %0 = toy.reduce_max %arg0 { axis = 1 }:
+        tensor<2x3x4xf64> -> tensor<2x3x4xf64
+  }];
+
+  let arguments = (ins F64Tensor:$input, I64Attr:$axis);
+  let results = (outs F64Tensor:$result);
+
+  let hasVerifier = 1;
+  //let hasCanonicalizer = 1;
+  //let hasFolder = 1;
+
+  let assemblyFormat = "$input attr-dict `:` type($input) `->` type($result)";
+}
+
 #endif // TOY_OPS

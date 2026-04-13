@@ -564,6 +564,10 @@ private:
 
       mlir::Value input = operands[0];
       auto axisConstant = operands[1].getDefiningOp<ConstantOp>();
+      if (!axisConstant) {
+        emitError(location, "toy.reduce_sum expects a constant value as axis.");
+        return nullptr;
+      }
       int64_t axis = (int64_t)axisConstant.getValue()
                         .getSplatValue<llvm::APFloat>()
                         .convertToDouble();
@@ -582,6 +586,37 @@ private:
       auto resultType = mlir::RankedTensorType::get(resultShape, inputType.getElementType());
 
       return builder.create<ReduceSumOp>(location, resultType, input, axis);
+    }
+
+    if (callee == "reduce_max") {
+      if (call.getArgs().size() != 2) {
+        emitError(location, "reduce_max expects exactly two arguments. (tensor, axis).");
+        return nullptr;
+      }
+
+      auto input = operands[0];
+      auto axisConstant = operands[1].getDefiningOp<ConstantOp>();
+      if (!axisConstant)  {
+        emitError(location , "reduce_max expects the axis to be a constant.");
+        return nullptr;
+      }
+      
+      int64_t axis = (int64_t)axisConstant.getValue()
+                    .getSplatValue<llvm::APFloat>()
+                    .convertToDouble();
+
+      auto inputType = llvm::dyn_cast<mlir::RankedTensorType>(input.getType());
+      if (!inputType) {
+        emitError(location, "reduce_max input tensor is required to be a ranked tensor.");
+        return nullptr;
+      }
+
+      SmallVector<int64_t> resultShape(inputType.getShape().begin(), inputType.getShape().end());
+      resultShape.erase(resultShape.begin() + axis);
+
+      auto resultType = mlir::RankedTensorType::get(resultShape, inputType.getElementType());
+
+      return builder.create<ReduceMaxOp>(location, resultType, input, axis);
     }
 
     // Otherwise this is a call to a user-defined function. Calls to

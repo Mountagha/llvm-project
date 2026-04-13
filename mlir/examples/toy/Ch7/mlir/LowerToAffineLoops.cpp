@@ -523,8 +523,8 @@ struct ReluOpLowering: public OpConversionPattern<toy::ReluOp> {
 
     Value alloc = insertAllocAndDealloc(resultMemRefType, loc, rewriter);
 
-    SmallVector<int64_t, 4> lowerBounds(inputMemRefType.getRank(), 0);
-    SmallVector<int64_t, 4> steps(inputMemRefType.getRank(), 1);
+    SmallVector<int64_t, 4> lowerBounds(resultMemRefType.getRank(), 0);
+    SmallVector<int64_t, 4> steps(resultMemRefType.getRank(), 1);
 
     auto elementType = llvm::cast<FloatType>(resultMemRefType.getElementType());
     auto zeroAttr = rewriter.getFloatAttr(elementType, 0.0);
