@@ -19,6 +19,7 @@
 #include "toy/Dialect.h"
 #include "llvm/Support/Casting.h"
 #include <cstddef>
+#include <limits>
 using namespace mlir;
 using namespace toy;
 
@@ -44,7 +45,7 @@ OpFoldResult StructAccessOp::fold(FoldAdaptor adaptor) {
   return structAttr[elementIndex];
 }
 
-
+/*
 OpFoldResult ReduceSumOp::fold(FoldAdaptor adaptor) {
   // 1) Fold only if operand is a constant dense FP tensor.
   auto inputAttr =
@@ -109,6 +110,101 @@ OpFoldResult ReduceSumOp::fold(FoldAdaptor adaptor) {
 
   // 7) Return a constant attribute replacing this op.
   return DenseElementsAttr::get(resultType, ArrayRef<double>(reduced));
+}
+*/
+
+/// FoldReduceHelper that can be used to implement multiple folding Op variants 
+/// (reducesum, reducemax, reduce_mean, ....) 
+static DenseElementsAttr foldReduction(
+  DenseFPElementsAttr inputAttr,
+  RankedTensorType resultType,
+  int64_t axis,
+  double identity,
+  llvm::function_ref<double(double, double)> combine) {
+
+    auto inputType = llvm::dyn_cast<RankedTensorType>(inputAttr.getType());
+    if (!inputType || !resultType)
+      return nullptr;
+    
+    int64_t rank = inputType.getRank();
+    if (rank <=0 || axis < 0 || axis >= rank)
+      return nullptr;
+    
+    // Build shape vectors.
+    llvm::SmallVector<int64_t> inputShape(inputType.getShape().begin(),
+                                          inputType.getShape().end());
+    llvm::SmallVector<int64_t> resultShape(resultType.getShape().begin(),
+                                          resultType.getShape().end());
+    // Helper to compute row-major strides.
+    auto computeStrides = [](ArrayRef<int64_t> shape) {
+      llvm::SmallVector<int64_t> strides(shape.size(), 1);
+      for (int64_t i = static_cast<int64_t>(shape.size()) - 2; i >= 0; --i) {
+        strides[i] = strides[i + 1] * shape[i + 1];
+      }
+      return strides;
+    };
+
+    auto inputStrides = computeStrides(inputShape);
+    auto resultStrides = computeStrides(resultShape);
+
+    // Accumulate reduces values
+    llvm::SmallVector<double> reduced(resultType.getNumElements(), identity);
+    auto inputValues = llvm::to_vector(inputAttr.getValues<double>());
+
+    for (int64_t linearIndex = 0, end = inputType.getNumElements(); linearIndex < end; ++linearIndex) {
+      int64_t remaining  = linearIndex;
+      int64_t resultLinearIndex = 0;
+      int64_t resultDim = 0;
+
+      for (int64_t dim = 0; dim < rank; ++dim) {
+        int64_t coord = remaining / inputStrides[dim];
+        remaining %= inputStrides[dim];
+
+        if (dim == axis) {
+          continue;
+        }
+
+        // if result is scalar, resultStrides is empty and index stays 0.
+        if (!resultStrides.empty())
+          resultLinearIndex += coord * resultStrides[resultDim];
+        ++resultDim;
+      }
+
+      reduced[resultLinearIndex] = combine(reduced[resultLinearIndex], inputValues[linearIndex]);
+    }
+
+    // Return a constant attribute replacing this op.
+    return DenseElementsAttr::get(resultType, ArrayRef<double>(reduced));
+}
+
+OpFoldResult ReduceSumOp::fold(FoldAdaptor adaptor) {
+
+  auto inputAttr = llvm::dyn_cast_if_present<DenseFPElementsAttr>(adaptor.getInput());
+  if (!inputAttr)
+    return nullptr;
+
+  int64_t axis = getAxis();
+  if (axis < 0) 
+    return nullptr;
+
+  auto resultType = llvm::dyn_cast<RankedTensorType>(getResult().getType());
+  return foldReduction(inputAttr, resultType, axis, 0.0,
+                      [](double a, double b) { return a + b; });
+}
+
+OpFoldResult ReduceMaxOp::fold(FoldAdaptor adaptor) {
+
+  auto inputAttr = llvm::dyn_cast_if_present<DenseFPElementsAttr>(adaptor.getInput());
+  if (!inputAttr)
+    return nullptr;
+
+  int64_t axis = getAxis();
+  if (axis < 0) 
+    return nullptr;
+
+  auto resultType = llvm::dyn_cast<RankedTensorType>(getResult().getType());
+  return foldReduction(inputAttr, resultType, axis, -std::numeric_limits<double>::infinity(),
+                      [](double a, double b) { return std::max(a, b); });
 }
 
 

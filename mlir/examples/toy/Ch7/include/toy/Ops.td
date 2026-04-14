@@ -552,7 +552,7 @@ def ReduceMaxOp : Toy_Op<"reduce_max", [Pure, DeclareOpInterfaceMethods<ShapeInf
 
   let hasVerifier = 1;
   //let hasCanonicalizer = 1;
-  //let hasFolder = 1;
+  let hasFolder = 1;
 
   let assemblyFormat = "$input attr-dict `:` type($input) `->` type($result)";
 }
