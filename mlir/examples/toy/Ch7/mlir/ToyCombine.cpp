@@ -45,74 +45,6 @@ OpFoldResult StructAccessOp::fold(FoldAdaptor adaptor) {
   return structAttr[elementIndex];
 }
 
-/*
-OpFoldResult ReduceSumOp::fold(FoldAdaptor adaptor) {
-  // 1) Fold only if operand is a constant dense FP tensor.
-  auto inputAttr =
-      llvm::dyn_cast_if_present<DenseFPElementsAttr>(adaptor.getInput());
-  if (!inputAttr)
-    return nullptr;
-
-  // 2) Require ranked input and ranked result.
-  auto inputType = llvm::dyn_cast<RankedTensorType>(inputAttr.getType());
-  auto resultType = llvm::dyn_cast<RankedTensorType>(getResult().getType());
-  if (!inputType || !resultType)
-    return nullptr;
-
-  // 3) Validate axis.
-  int64_t rank = inputType.getRank();
-  int64_t axis = getAxis();
-  if (rank <= 0 || axis < 0 || axis >= rank)
-    return nullptr;
-
-  // 4) Build shape vectors.
-  llvm::SmallVector<int64_t> inputShape(inputType.getShape().begin(),
-                                        inputType.getShape().end());
-  llvm::SmallVector<int64_t> resultShape(resultType.getShape().begin(),
-                                         resultType.getShape().end());
-
-  // 5) Helper to compute row-major strides.
-  auto computeStrides = [](ArrayRef<int64_t> shape) {
-    llvm::SmallVector<int64_t> strides(shape.size(), 1);
-    for (int64_t i = static_cast<int64_t>(shape.size()) - 2; i >= 0; --i)
-      strides[i] = strides[i + 1] * shape[i + 1];
-    return strides;
-  };
-
-  auto inputStrides = computeStrides(inputShape);
-  auto resultStrides = computeStrides(resultShape);
-
-  // 6) Accumulate reduced values.
-  llvm::SmallVector<double> reduced(resultType.getNumElements(), 0.0);
-  auto inputValues = llvm::to_vector(inputAttr.getValues<double>());
-
-  for (int64_t linearIndex = 0, end = inputType.getNumElements();
-       linearIndex < end; ++linearIndex) {
-    int64_t remaining = linearIndex;
-    int64_t resultLinearIndex = 0;
-    int64_t resultDim = 0;
-
-    for (int64_t dim = 0; dim < rank; ++dim) {
-      int64_t coord = remaining / inputStrides[dim];
-      remaining %= inputStrides[dim];
-
-      if (dim == axis)
-        continue;
-
-      // If result is scalar, resultStrides is empty and index stays 0.
-      if (!resultStrides.empty())
-        resultLinearIndex += coord * resultStrides[resultDim];
-      ++resultDim;
-    }
-
-    reduced[resultLinearIndex] += inputValues[linearIndex];
-  }
-
-  // 7) Return a constant attribute replacing this op.
-  return DenseElementsAttr::get(resultType, ArrayRef<double>(reduced));
-}
-*/
-
 /// FoldReduceHelper that can be used to implement multiple folding Op variants 
 /// (reducesum, reducemax, reduce_mean, ....) 
 static DenseElementsAttr foldReduction(
@@ -257,6 +189,32 @@ struct SimplifyNestedRelu: public mlir::OpRewritePattern<ReluOp> {
   }
 };
 
+// ReduceMax(x, axis) where dim(axis) = 1 -> Reshape(x, all dims except axis)
+struct ReduceToReshape : public mlir::OpRewritePattern<ReduceMaxOp> {
+  ReduceToReshape(mlir::MLIRContext *context)
+    : OpRewritePattern<ReduceMaxOp>(context, /* benefit */1) {}
+  
+  llvm::LogicalResult
+  matchAndRewrite(ReduceMaxOp op, mlir::PatternRewriter &rewriter) const override {
+    auto inputType = llvm::cast<RankedTensorType>(op.getInput().getType());
+    int64_t axis = op.getAxis();
+
+    if (inputType.getDimSize(axis) != 1)
+      return failure();
+
+    int64_t rank = inputType.getRank();
+    llvm::SmallVector<int64_t> outputShape;
+    outputShape.reserve(rank - 1);
+    for (int64_t i = 0; i<rank; ++i) {
+      if (i != axis) {
+        outputShape.push_back(inputType.getDimSize(i));
+      }
+    }
+
+    rewriter.replaceOpWithNewOp<ReshapeOp>(op, op.getResult().getType(), op.getInput());
+    return success();  
+  }
+};
 
 /// Fold neg(neg(x)) -> x
 struct SimplifyRedundantNeg : public mlir::OpRewritePattern<NegOp> {
@@ -329,4 +287,11 @@ void MaxOp::getCanonicalizationPatterns(RewritePatternSet &results,
 void ReluOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                         MLIRContext *context) {
   results.add<SimplifyNestedRelu>(context);
+}
+
+/// Register our patterns as "canonicalization" patterns on the ReduceMaxOp so
+/// that they can be picked up by the Canonicalization framework.
+void ReduceMaxOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                        MLIRContext *context) {
+  results.add<ReduceToReshape>(context);
 }

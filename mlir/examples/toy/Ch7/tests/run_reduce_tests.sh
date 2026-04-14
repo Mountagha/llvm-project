@@ -1,12 +1,20 @@
 set -euo pipefail
 
-TEST="reduce_sum.mlir"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../../../.." && pwd)"
+
+#TEST="$SCRIPT_DIR/reduce_sum.mlir"
+TEST="$SCRIPT_DIR/reduce_max.mlir"
 OUTDIR="/tmp/tests"
+
+TOYC="${TOYC:-$REPO_ROOT/build/bin/toyc-ch7}"
+SPLIT_FILE="${SPLIT_FILE:-$(command -v split-file-20)}"
+FILECHECK="${FILECHECK:-$(command -v FileCheck-20)}"
 
 rm -rf "$OUTDIR"
 mkdir -p "$OUTDIR"
 
-split-file-20 "$TEST" "$OUTDIR"
+"$SPLIT_FILE" "$TEST" "$OUTDIR"
 
 # file -> check-prefix -> expect_fail(0/1)
 cases=(
@@ -23,11 +31,11 @@ for c in "${cases[@]}"; do
 
   echo "==> $file ($prefix, expect_fail=$expect_fail)"
   if [[ "$expect_fail" == "1" ]]; then
-    $toyc -x=mlir -emit=mlir "$input" 2>&1 \
-      | FileCheck-20 "$TEST" --check-prefix="$prefix"
+    { "$TOYC" -x=mlir -emit=mlir "$input" 2>&1 || true; } \
+      | "$FILECHECK" "$TEST" --check-prefix="$prefix"
   else
-    $toyc -x=mlir -emit=mlir -opt "$input" 2>&1 \
-      | FileCheck-20 "$TEST" --check-prefix="$prefix"
+    "$TOYC" -x=mlir -emit=mlir -opt "$input" 2>&1 \
+      | "$FILECHECK" "$TEST" --check-prefix="$prefix"
   fi
 done
 
