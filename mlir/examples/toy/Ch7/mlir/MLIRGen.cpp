@@ -619,6 +619,25 @@ private:
       return builder.create<ReduceMaxOp>(location, resultType, input, axis);
     }
 
+    if (callee == "matmul") {
+      if (call.getArgs().size() != 2) {
+        emitError(location, "toy.matmul expects exactly 2 arguments (lhs, rhs)");
+        return nullptr;
+      }
+      mlir::Value lhs = operands[0];
+      mlir::Value rhs = operands[1];
+      auto lhsType = llvm::dyn_cast<mlir::RankedTensorType>(lhs.getType());
+      auto rhsType = llvm::dyn_cast<mlir::RankedTensorType>(rhs.getType());
+      if (!lhsType || !rhsType) {
+        emitError(location, "toy.matmul requires ranked tensor operands");
+        return nullptr;
+      }
+      auto resultType = mlir::RankedTensorType::get(
+          {lhsType.getDimSize(0), rhsType.getDimSize(1)},
+          lhsType.getElementType());
+      return builder.create<MatMulOp>(location, resultType, lhs, rhs);
+    }
+
     // Otherwise this is a call to a user-defined function. Calls to
     // user-defined functions are mapped to a custom call that takes the callee
     // name as an attribute.

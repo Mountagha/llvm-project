@@ -435,35 +435,6 @@ struct ReduceSumOpLowering : public OpConversionPattern<toy::ReduceSumOp> {
       }, loc, rewriter
     );
 
-    /*
-    // Initialize the accumulation buffer.
-    initMemrefWithValue(alloc, loc, 0.0, rewriter);
-
-
-    SmallVector<int64_t, 4> lowerBounds(inputMemRefType.getRank(), 0);
-    SmallVector<int64_t, 4> steps(inputMemRefType.getRank(), 1);
-
-    affine::buildAffineLoopNest(
-      rewriter, loc, lowerBounds, inputMemRefType.getShape(), steps,
-      [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange ivs) {
-        Value inputElement = nestedBuilder.create<affine::AffineLoadOp>(nestedLoc, input, ivs);
-
-        // Project input indices to output indices by dropping the reduced axis.
-        SmallVector<Value, 4> resultIvs;
-        resultIvs.reserve(ivs.size() - 1);
-        for (const auto& it : llvm::enumerate(ivs)) {
-          if (static_cast<int64_t>(it.index()) != axis)
-            resultIvs.push_back(it.value());
-        }
-
-        Value current = 
-              nestedBuilder.create<affine::AffineLoadOp>(nestedLoc, alloc, resultIvs);
-        Value updated = 
-              nestedBuilder.create<arith::AddFOp>(nestedLoc, current, inputElement);
-        nestedBuilder.create<affine::AffineStoreOp>(nestedLoc, updated, alloc, resultIvs);
-      }
-    );
-  */
   rewriter.replaceOp(op, alloc);
   return success();
   }
@@ -503,6 +474,50 @@ struct ReduceMaxOpLowering : public OpConversionPattern<toy::ReduceMaxOp> {
   }
 };
 } // namespace
+
+namespace {
+struct MatMulOpLowering : public OpConversionPattern<toy::MatMulOp> {
+  using OpConversionPattern<toy::MatMulOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(toy::MatMulOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
+
+    Location loc = op.getLoc();
+    Value lhs = adaptor.getLhs();
+    Value rhs = adaptor.getRhs();
+    auto lhsMemRefType = llvm::cast<MemRefType>(lhs.getType());
+    auto rhsMemRefType = llvm::cast<MemRefType>(rhs.getType());
+
+    auto resultTensorType = llvm::cast<RankedTensorType>(op.getResult().getType());
+    auto resultMemRefType = convertTensorToMemRef(resultTensorType);
+
+    Value alloc = insertAllocAndDealloc(resultMemRefType, loc, rewriter);
+    initMemrefWithValue(alloc, loc, 0.0, rewriter);
+    
+    int64_t M = lhsMemRefType.getShape()[0];
+    int64_t K = lhsMemRefType.getShape()[1];
+    int64_t N = rhsMemRefType.getShape()[1];
+
+    affine::buildAffineLoopNest(
+      rewriter, loc, {0, 0, 0}, {M, N, K}, {1, 1, 1},
+      [&] (OpBuilder& nestedBuilder, Location nestedLoc, ValueRange ivs) {
+        Value i = ivs[0], j = ivs[1], k = ivs[2];
+        Value acc = nestedBuilder.create<affine::AffineLoadOp>(nestedLoc, alloc, ValueRange{i, j});
+        Value l   = nestedBuilder.create<affine::AffineLoadOp>(nestedLoc, lhs,   ValueRange{i, k});
+        Value r   = nestedBuilder.create<affine::AffineLoadOp>(nestedLoc, rhs,   ValueRange{k, j});
+        Value mul = nestedBuilder.create<arith::MulFOp>(nestedLoc, l, r);
+        Value sum = nestedBuilder.create<arith::AddFOp>(nestedLoc, acc, mul);
+        nestedBuilder.create<affine::AffineStoreOp>(nestedLoc, sum, alloc, ValueRange{i, j});
+      }
+    );
+
+    rewriter.replaceOp(op, alloc);
+    return success();
+  }
+};
+
+} // namespace.
 
 static SmallVector<Value, 4> projectBroadcastIndices(
   ArrayRef<int64_t> operandShape,
@@ -667,7 +682,7 @@ void ToyToAffineLoweringPass::runOnOperation() {
   // Now that the conversion target has been defined, we just need to provide
   // the set of patterns that will lower the Toy operations.
   RewritePatternSet patterns(&getContext());
-  patterns.add<AddOpLowering, ConstantOpLowering, FuncOpLowering, MulOpLowering,
+  patterns.add<AddOpLowering, ConstantOpLowering, FuncOpLowering, MulOpLowering, MatMulOpLowering,
                PrintOpLowering, ReturnOpLowering, TransposeOpLowering, MaxOpLowering,
                NegOpLowering, ReduceSumOpLowering, ReduceMaxOpLowering, ReluOpLowering>(
       &getContext());

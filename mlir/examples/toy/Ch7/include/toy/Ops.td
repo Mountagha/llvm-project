@@ -557,4 +557,23 @@ def ReduceMaxOp : Toy_Op<"reduce_max", [Pure, DeclareOpInterfaceMethods<ShapeInf
   let assemblyFormat = "$input attr-dict `:` type($input) `->` type($result)";
 }
 
+def MatMulOp : Toy_Op<"matmul", [Pure, DeclareOpInterfaceMethods<ShapeInferenceOpInterface>]> {
+  let summary = "compute the dot product of 2 matrices.";
+  let description = [{
+    compute the dot product of 2 matrices of shapes [M, N] x [N, K] to produce
+    a matrice of shape [M, K]
+
+    Example:
+      %0 = toy.matmul %m1, %m2 :
+        (tensor<2x3xf64>, tensor<3x4xf64>) -> tensor<2x4xf64>
+  }];
+
+  let arguments = (ins F64Tensor:$lhs, F64Tensor:$rhs);
+  let results = (outs F64Tensor:$result);
+
+  let hasVerifier = 1;
+  let assemblyFormat = "$lhs `,` $rhs attr-dict `:` "
+                    "type($lhs) `,` type($rhs) `->` type($result)";
+}
+
 #endif // TOY_OPS

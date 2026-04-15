@@ -649,6 +649,43 @@ llvm::LogicalResult MaxOp::verify() {
   return success();
 }
 
+llvm::LogicalResult MatMulOp::verify() {
+  auto lhsType = llvm::dyn_cast<RankedTensorType>(getLhs().getType());
+  auto rhsType = llvm::dyn_cast<RankedTensorType>(getRhs().getType());
+  auto resultType = llvm::dyn_cast<RankedTensorType>(getResult().getType());
+  if (!lhsType || !rhsType || !resultType) 
+    return emitOpError("requires ranked tensor operands and results");
+
+  int64_t lhsRank = lhsType.getRank();
+  int64_t rhsRank = rhsType.getRank();
+  if (lhsRank != 2 || rhsRank != 2) 
+    return emitOpError("requires lhs and rhs to have tensor of rank 2");
+
+  int64_t lhsInnerDim = lhsType.getDimSize(1);
+  int64_t rhsOuterDim = rhsType.getDimSize(0);
+  if (lhsInnerDim != rhsOuterDim)
+    return emitOpError("lhs inner dim must match rhs outer dim.");
+  
+  if (resultType.getDimSize(0) != lhsType.getDimSize(0) 
+      || resultType.getDimSize(1) != rhsType.getDimSize(1))
+    return emitOpError() << "expect result of shape : (" 
+      << lhsType.getDimSize(0) << ", " << rhsType.getDimSize(1) << " ), got ( " 
+      << resultType.getDimSize(0) << ", " << resultType.getDimSize(1) << " ).";
+
+  return success();
+}
+
+void MatMulOp::inferShapes() {
+  auto lhsType = llvm::dyn_cast<RankedTensorType>(getLhs().getType());
+  auto rhsType = llvm::dyn_cast<RankedTensorType>(getRhs().getType());
+
+  assert (lhsType && rhsType && "both matmul operands are required to be ranked tensors.");
+
+  getResult().setType(RankedTensorType::get(
+    {lhsType.getDimSize(0), rhsType.getDimSize(1)},
+    lhsType.getElementType()));
+}
+
 //===----------------------------------------------------------------------===//
 // Toy Types
 //===----------------------------------------------------------------------===//
