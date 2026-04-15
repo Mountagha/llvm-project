@@ -40,6 +40,7 @@
 #include <functional>
 #include <memory>
 #include <utility>
+#include <limits>
 
 using namespace mlir;
 
@@ -352,15 +353,15 @@ struct TransposeOpLowering : public ConversionPattern {
 // Helper function to initialize a given memref with 0.
 //===----------------------------------------------------------------------===//
 
-static void zeroInitMemref(Value memref, Location loc, PatternRewriter &rewriter) {
+static void initMemrefWithValue(Value memref, Location loc, double init, PatternRewriter &rewriter) {
   auto memRefType = llvm::cast<MemRefType>(memref.getType());
   auto elementType = llvm::cast<FloatType>(memRefType.getElementType());
-  auto zeroAttr = rewriter.getFloatAttr(elementType, 0.0);
-  Value zero = rewriter.create<arith::ConstantOp>(loc, zeroAttr);
+  auto initAttr = rewriter.getFloatAttr(elementType, init);
+  Value initVal = rewriter.create<arith::ConstantOp>(loc, initAttr);
 
   // Rank-0 memref: store the scalar directly. No need for a loop.
   if (memRefType.getRank() == 0) {
-    rewriter.create<affine::AffineStoreOp>(loc, zero, memref, ValueRange{});
+    rewriter.create<affine::AffineStoreOp>(loc, initVal, memref, ValueRange{});
     return;
   }
 
@@ -369,10 +370,41 @@ static void zeroInitMemref(Value memref, Location loc, PatternRewriter &rewriter
   affine::buildAffineLoopNest(
     rewriter, loc, lowerBounds, memRefType.getShape(), steps,
     [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange ivs) {
-      nestedBuilder.create<affine::AffineStoreOp>(nestedLoc, zero, memref, ivs);
+      nestedBuilder.create<affine::AffineStoreOp>(nestedLoc, initVal, memref, ivs);
     }
   );
 }
+
+static void lowerReduction(
+  Value input, Value alloc, int64_t axis, double initVal,
+  function_ref<Value(OpBuilder &, Location, Value, Value)> combineOp,
+  Location loc, PatternRewriter &rewriter) {
+
+  auto inputMemRefType = llvm::cast<MemRefType>(input.getType());
+  initMemrefWithValue(alloc, loc, initVal, rewriter);
+
+  SmallVector<int64_t, 4> lowerBounds(inputMemRefType.getRank(), 0);
+  SmallVector<int64_t, 4> steps(inputMemRefType.getRank(), 1);
+
+  affine::buildAffineLoopNest(
+    rewriter, loc, lowerBounds, inputMemRefType.getShape(), steps,
+    [&] (OpBuilder &nestedBuilder, Location nestedLoc, ValueRange ivs) {
+      Value inputElement = nestedBuilder.create<affine::AffineLoadOp>(nestedLoc, input, ivs);
+
+      // Project input indices to output indices by dropping the reduce axis.
+      SmallVector<Value, 4> resultIvs;
+      resultIvs.reserve(ivs.size() - 1);
+      for (const auto& it : llvm::enumerate(ivs)) {
+        if (static_cast<int64_t>(it.index()) != axis)
+          resultIvs.push_back(it.value());
+      }
+      Value current = nestedBuilder.create<affine::AffineLoadOp>(nestedLoc, alloc, resultIvs);
+      Value updated = combineOp(nestedBuilder, nestedLoc, current, inputElement);
+      nestedBuilder.create<affine::AffineStoreOp>(nestedLoc, updated, alloc, resultIvs);
+    }
+  );
+}
+
 
 //===----------------------------------------------------------------------===//
 // ToyToAffine RewritePatterns: Reduce sum op.
@@ -389,17 +421,24 @@ struct ReduceSumOpLowering : public OpConversionPattern<toy::ReduceSumOp> {
     Location loc = op.getLoc();
 
     Value input = adaptor.getInput();
-    auto inputMemRefType = llvm::cast<MemRefType>(input.getType());
 
     auto resultTensorType = llvm::cast<RankedTensorType>(op.getResult().getType());
     auto resultMemRefType = convertTensorToMemRef(resultTensorType);
 
     Value alloc = insertAllocAndDealloc(resultMemRefType, loc, rewriter);
-
-    // Initialize the accumulation buffer.
-    zeroInitMemref(alloc, loc, rewriter);
-
     int64_t axis = op.getAxis();
+    
+
+    lowerReduction(input, alloc, axis, 0.0,
+      [](OpBuilder &b, Location loc, Value a, Value x) {
+        return b.create<arith::AddFOp>(loc, a, x);
+      }, loc, rewriter
+    );
+
+    /*
+    // Initialize the accumulation buffer.
+    initMemrefWithValue(alloc, loc, 0.0, rewriter);
+
 
     SmallVector<int64_t, 4> lowerBounds(inputMemRefType.getRank(), 0);
     SmallVector<int64_t, 4> steps(inputMemRefType.getRank(), 1);
@@ -424,13 +463,45 @@ struct ReduceSumOpLowering : public OpConversionPattern<toy::ReduceSumOp> {
         nestedBuilder.create<affine::AffineStoreOp>(nestedLoc, updated, alloc, resultIvs);
       }
     );
-  
+  */
   rewriter.replaceOp(op, alloc);
   return success();
   }
 };
 
 
+} // namespace
+
+
+namespace {
+
+struct ReduceMaxOpLowering : public OpConversionPattern<toy::ReduceMaxOp> {
+  using OpConversionPattern<toy::ReduceMaxOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(toy::ReduceMaxOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
+    Location loc = op.getLoc();
+
+    Value input = adaptor.getInput();
+
+    auto resultTensorType = llvm::cast<RankedTensorType>(op.getResult().getType());
+    auto resultMemRefType = convertTensorToMemRef(resultTensorType);
+
+    Value alloc = insertAllocAndDealloc(resultMemRefType, loc, rewriter);
+    int64_t axis = op.getAxis();
+
+    lowerReduction(input, alloc, axis, -std::numeric_limits<double>::infinity(),
+      [](OpBuilder &b, Location loc, Value a, Value x) {
+        return b.create<arith::MaximumFOp>(loc, a, x);
+      }, loc, rewriter
+    );
+
+    rewriter.replaceOp(op, alloc);
+    return success();
+
+  }
+};
 } // namespace
 
 static SmallVector<Value, 4> projectBroadcastIndices(
@@ -598,7 +669,7 @@ void ToyToAffineLoweringPass::runOnOperation() {
   RewritePatternSet patterns(&getContext());
   patterns.add<AddOpLowering, ConstantOpLowering, FuncOpLowering, MulOpLowering,
                PrintOpLowering, ReturnOpLowering, TransposeOpLowering, MaxOpLowering,
-               NegOpLowering, ReduceSumOpLowering, ReluOpLowering>(
+               NegOpLowering, ReduceSumOpLowering, ReduceMaxOpLowering, ReluOpLowering>(
       &getContext());
 
   // With the target and rewrite patterns defined, we can now attempt the
