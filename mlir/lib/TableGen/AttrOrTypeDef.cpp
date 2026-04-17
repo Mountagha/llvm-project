@@ -46,7 +46,7 @@ AttrOrTypeDef::AttrOrTypeDef(const Record *def) : def(def) {
   const auto *builderList =
       dyn_cast_or_null<ListInit>(def->getValueInit("builders"));
   if (builderList && !builderList->empty()) {
-    for (const Init *init : builderList->getValues()) {
+    for (const Init *init : builderList->getElements()) {
       AttrOrTypeBuilder builder(cast<DefInit>(init)->getDef(), def->getLoc());
 
       // Ensure that all parameters have names.
@@ -190,9 +190,11 @@ bool AttrOrTypeDef::genVerifyDecl() const {
 }
 
 bool AttrOrTypeDef::genVerifyInvariantsImpl() const {
-  return any_of(parameters, [](const AttrOrTypeParameter &p) {
-    return p.getConstraint() != std::nullopt;
-  });
+  return any_of(parameters,
+                [](const AttrOrTypeParameter &p) {
+                  return p.getConstraint() != std::nullopt;
+                }) ||
+         any_of(traits, [](const Trait &t) { return isa<PredTrait>(&t); });
 }
 
 std::optional<StringRef> AttrOrTypeDef::getExtraDecls() const {

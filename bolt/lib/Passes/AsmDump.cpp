@@ -109,7 +109,7 @@ void dumpFunction(const BinaryFunction &BF) {
   }
 
   std::string PrintName = BF.getPrintName();
-  std::replace(PrintName.begin(), PrintName.end(), '/', '-');
+  llvm::replace(PrintName, '/', '-');
   std::string Filename =
       opts::AsmDump.empty()
           ? (PrintName + ".s")
@@ -142,7 +142,7 @@ void dumpFunction(const BinaryFunction &BF) {
   std::unique_ptr<MCStreamer> AsmStreamer(createAsmStreamer(
       *LocalCtx, std::move(FOut), std::move(InstructionPrinter),
       std::move(MCEInstance.MCE), std::move(MAB)));
-  AsmStreamer->initSections(true, *BC.STI);
+  AsmStreamer->initSections(*BC.STI);
   std::unique_ptr<TargetMachine> TM(BC.TheTarget->createTargetMachine(
       *BC.TheTriple, "", "", TargetOptions(), std::nullopt));
   std::unique_ptr<AsmPrinter> MAP(

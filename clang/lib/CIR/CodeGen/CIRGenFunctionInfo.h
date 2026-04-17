@@ -16,14 +16,12 @@
 #define LLVM_CLANG_CIR_CIRGENFUNCTIONINFO_H
 
 #include "clang/AST/CanonicalType.h"
+#include "clang/CIR/ABIArgInfo.h"
+#include "clang/CIR/MissingFeatures.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/Support/TrailingObjects.h"
 
 namespace clang::CIRGen {
-
-struct CIRGenFunctionInfoArgInfo {
-  CanQualType type;
-};
 
 /// A class for recording the number of arguments that a function signature
 /// requires.
@@ -47,19 +45,21 @@ public:
   ///
   /// If FD is not null, this will consider pass_object_size params in FD.
   static RequiredArgs
-  forPrototypePlus(const clang::FunctionProtoType *prototype) {
+  getFromProtoWithExtraSlots(const clang::FunctionProtoType *prototype,
+                             unsigned additional) {
     if (!prototype->isVariadic())
       return All;
 
     if (prototype->hasExtParameterInfos())
       llvm_unreachable("NYI");
 
-    return RequiredArgs(prototype->getNumParams());
+    return RequiredArgs(prototype->getNumParams() + additional);
   }
 
   static RequiredArgs
-  forPrototypePlus(clang::CanQual<clang::FunctionProtoType> prototype) {
-    return forPrototypePlus(prototype.getTypePtr());
+  getFromProtoWithExtraSlots(clang::CanQual<clang::FunctionProtoType> prototype,
+                             unsigned additional) {
+    return getFromProtoWithExtraSlots(prototype.getTypePtr(), additional);
   }
 
   unsigned getNumRequiredArgs() const {
@@ -68,23 +68,42 @@ public:
   }
 };
 
+// The TrailingObjects for this class contain the function return type in the
+// first CanQualType slot, followed by the argument types.
 class CIRGenFunctionInfo final
     : public llvm::FoldingSetNode,
-      private llvm::TrailingObjects<CIRGenFunctionInfo,
-                                    CIRGenFunctionInfoArgInfo> {
-  using ArgInfo = CIRGenFunctionInfoArgInfo;
+      private llvm::TrailingObjects<CIRGenFunctionInfo, CanQualType> {
+  // Whether this function has noreturn.
+  LLVM_PREFERRED_TYPE(bool)
+  unsigned noReturn : 1;
+
+  // Whether this is an instance method/non-static member function with implicit
+  // 'this' argument.
+  LLVM_PREFERRED_TYPE(bool)
+  unsigned instanceMethod : 1;
 
   RequiredArgs required;
 
   unsigned numArgs;
 
-  ArgInfo *getArgsBuffer() { return getTrailingObjects<ArgInfo>(); }
-  const ArgInfo *getArgsBuffer() const { return getTrailingObjects<ArgInfo>(); }
+  CanQualType *getArgTypes() { return getTrailingObjects(); }
+  const CanQualType *getArgTypes() const { return getTrailingObjects(); }
 
   CIRGenFunctionInfo() : required(RequiredArgs::All) {}
 
+  FunctionType::ExtInfo getExtInfo() const {
+    // TODO(cir): as we add this information to this type, we need to add calls
+    // here instead of explicit false/0.
+    return FunctionType::ExtInfo(
+        isNoReturn(), /*getHasRegParm=*/false, /*getRegParm=*/false,
+        /*getASTCallingConvention=*/CallingConv(0), /*isReturnsRetained=*/false,
+        /*isNoCallerSavedRegs=*/false, /*isNoCfCheck=*/false,
+        /*isCmseNSCall=*/false);
+  }
+
 public:
-  static CIRGenFunctionInfo *create(CanQualType resultType,
+  static CIRGenFunctionInfo *create(FunctionType::ExtInfo info,
+                                    bool instanceMethod, CanQualType resultType,
                                     llvm::ArrayRef<CanQualType> argTypes,
                                     RequiredArgs required);
 
@@ -94,15 +113,18 @@ public:
   // these have to be public.
   friend class TrailingObjects;
 
-  using const_arg_iterator = const ArgInfo *;
-  using arg_iterator = ArgInfo *;
+  using const_arg_iterator = const CanQualType *;
+  using arg_iterator = CanQualType *;
 
   // This function has to be CamelCase because llvm::FoldingSet requires so.
   // NOLINTNEXTLINE(readability-identifier-naming)
-  static void Profile(llvm::FoldingSetNodeID &id, RequiredArgs required,
+  static void Profile(llvm::FoldingSetNodeID &id, bool instanceMethod,
+                      FunctionType::ExtInfo info, RequiredArgs required,
                       CanQualType resultType,
                       llvm::ArrayRef<CanQualType> argTypes) {
-    id.AddBoolean(required.getOpaqueData());
+    id.AddBoolean(instanceMethod);
+    id.AddBoolean(info.getNoReturn());
+    id.AddInteger(required.getOpaqueData());
     resultType.Profile(id);
     for (const CanQualType &arg : argTypes)
       arg.Profile(id);
@@ -110,34 +132,55 @@ public:
 
   // NOLINTNEXTLINE(readability-identifier-naming)
   void Profile(llvm::FoldingSetNodeID &id) {
-    id.AddBoolean(required.getOpaqueData());
-    getReturnType().Profile(id);
+    // If the Profile functions get out of sync, we can end up with incorrect
+    // function signatures, so we call the static Profile function here rather
+    // than duplicating the logic.
+    Profile(id, isInstanceMethod(), getExtInfo(), required, getReturnType(),
+            arguments());
   }
 
-  CanQualType getReturnType() const { return getArgsBuffer()[0].type; }
-
-  const_arg_iterator argInfoBegin() const { return getArgsBuffer() + 1; }
-  const_arg_iterator argInfoEnd() const {
-    return getArgsBuffer() + 1 + numArgs;
+  llvm::ArrayRef<CanQualType> arguments() const {
+    return llvm::ArrayRef<CanQualType>(argTypesBegin(), numArgs);
   }
-  arg_iterator argInfoBegin() { return getArgsBuffer() + 1; }
-  arg_iterator argInfoEnd() { return getArgsBuffer() + 1 + numArgs; }
 
-  unsigned argInfoSize() const { return numArgs; }
-
-  llvm::MutableArrayRef<ArgInfo> argInfos() {
-    return llvm::MutableArrayRef<ArgInfo>(argInfoBegin(), numArgs);
+  llvm::ArrayRef<CanQualType> requiredArguments() const {
+    return llvm::ArrayRef<CanQualType>(argTypesBegin(), getNumRequiredArgs());
   }
-  llvm::ArrayRef<ArgInfo> argInfos() const {
-    return llvm::ArrayRef<ArgInfo>(argInfoBegin(), numArgs);
+
+  CanQualType getReturnType() const { return getArgTypes()[0]; }
+
+  cir::ABIArgInfo getReturnInfo() const {
+    assert(!cir::MissingFeatures::abiArgInfo());
+    // TODO(cir): we currently just 'fake' this, but should calculate
+    // this/figure out what it means when we get our ABI info set correctly.
+    // For now, we leave this as a direct return.
+
+    return cir::ABIArgInfo::getDirect();
+  }
+
+  const_arg_iterator argTypesBegin() const { return getArgTypes() + 1; }
+  const_arg_iterator argTypesEnd() const { return getArgTypes() + 1 + numArgs; }
+  arg_iterator argTypesBegin() { return getArgTypes() + 1; }
+  arg_iterator argTypesEnd() { return getArgTypes() + 1 + numArgs; }
+
+  unsigned argTypeSize() const { return numArgs; }
+
+  llvm::MutableArrayRef<CanQualType> argTypes() {
+    return llvm::MutableArrayRef<CanQualType>(argTypesBegin(), numArgs);
+  }
+  llvm::ArrayRef<CanQualType> argTypes() const {
+    return llvm::ArrayRef<CanQualType>(argTypesBegin(), numArgs);
   }
 
   bool isVariadic() const { return required.allowsOptionalArgs(); }
   RequiredArgs getRequiredArgs() const { return required; }
   unsigned getNumRequiredArgs() const {
     return isVariadic() ? getRequiredArgs().getNumRequiredArgs()
-                        : argInfoSize();
+                        : argTypeSize();
   }
+
+  bool isNoReturn() const { return noReturn; }
+  bool isInstanceMethod() const { return instanceMethod; }
 };
 
 } // namespace clang::CIRGen

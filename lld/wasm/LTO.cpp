@@ -10,33 +10,25 @@
 #include "Config.h"
 #include "InputFiles.h"
 #include "Symbols.h"
-#include "lld/Common/Args.h"
 #include "lld/Common/CommonLinkerContext.h"
 #include "lld/Common/ErrorHandler.h"
 #include "lld/Common/Filesystem.h"
 #include "lld/Common/Strings.h"
 #include "lld/Common/TargetOptionsCommandFlags.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/DiagnosticPrinter.h"
 #include "llvm/LTO/Config.h"
 #include "llvm/LTO/LTO.h"
-#include "llvm/Object/SymbolicFile.h"
 #include "llvm/Support/Caching.h"
 #include "llvm/Support/CodeGen.h"
-#include "llvm/Support/Error.h"
-#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
-#include <algorithm>
 #include <cstddef>
 #include <memory>
 #include <string>
-#include <system_error>
 #include <vector>
 
 using namespace llvm;
@@ -59,14 +51,36 @@ static lto::Config createConfig() {
   c.DisableVerify = ctx.arg.disableVerify;
   c.DiagHandler = diagnosticHandler;
   c.OptLevel = ctx.arg.ltoo;
+  c.CPU = getCPUStr();
   c.MAttrs = getMAttrs();
+
+  // If shared memory is enabled, ensure the TargetMachine backend is
+  // instantiated with atomics and bulk-memory features so that empty
+  // partitioned ThinLTO modules don't incorrectly strip TLS variables or fall
+  // back to defaults. This bypasses a bug where deleted functions take their
+  // target-features away. This is only necessary for atomics (and not other
+  // features) because Atomics and TLS are the only features we lower away
+  // during codegen.
+  if (ctx.arg.sharedMemory) {
+    c.MAttrs.push_back("+atomics");
+    c.MAttrs.push_back("+bulk-memory");
+  }
+
   c.CGOptLevel = ctx.arg.ltoCgo;
   c.DebugPassManager = ctx.arg.ltoDebugPassManager;
   c.AlwaysEmitRegularLTOObj = !ctx.arg.ltoObjPath.empty();
 
-  if (ctx.arg.relocatable)
+  if (auto relocModel = getRelocModelFromCMModel())
+    c.RelocModel = *relocModel;
+  else if (ctx.arg.relocatable)
     c.RelocModel = std::nullopt;
   else if (ctx.isPic)
+    c.RelocModel = Reloc::PIC_;
+  else if (ctx.arg.unresolvedSymbols == UnresolvedPolicy::ImportDynamic)
+    // With ImportDynamic we also need to use the PIC relocation model so that
+    // external symbols are references via the GOT.
+    // TODO(sbc): This should probably be Reloc::DynamicNoPIC, but the backend
+    // doesn't currently support that.
     c.RelocModel = Reloc::PIC_;
   else
     c.RelocModel = Reloc::Static;
@@ -179,6 +193,10 @@ static void thinLTOCreateEmptyIndexFiles() {
     if (ctx.arg.thinLTOEmitImportsFiles)
       openFile(path + ".imports");
   }
+}
+
+void BitcodeCompiler::setBitcodeLibFuncs(ArrayRef<StringRef> bitcodeLibFuncs) {
+  ltoObj->setBitcodeLibFuncs(bitcodeLibFuncs);
 }
 
 // Merge all the bitcode files we have seen, codegen the result

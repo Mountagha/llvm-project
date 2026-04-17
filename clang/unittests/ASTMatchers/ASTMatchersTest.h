@@ -110,7 +110,7 @@ testing::AssertionResult matchesConditionally(
   // Append additional arguments at the end to allow overriding the default
   // choices that we made above.
   llvm::copy(CompileArgs, std::back_inserter(Args));
-  if (llvm::find(Args, "-target") == Args.end()) {
+  if (!llvm::is_contained(Args, "-target")) {
     // Use an unknown-unknown triple so we don't instantiate the full system
     // toolchain.  On Linux, instantiating the toolchain involves stat'ing
     // large portions of /usr/lib, and this slows down not only this test, but
@@ -287,6 +287,20 @@ testing::AssertionResult notMatchesWithOpenMP51(const Twine &Code,
                                                 const T &AMatcher) {
   return matchesConditionally(Code, AMatcher, false,
                               {"-fopenmp=libomp", "-fopenmp-version=51"});
+}
+
+template <typename T>
+testing::AssertionResult matchesWithOpenMP60(const Twine &Code,
+                                             const T &AMatcher) {
+  return matchesConditionally(Code, AMatcher, true,
+                              {"-fopenmp=libomp", "-fopenmp-version=60"});
+}
+
+template <typename T>
+testing::AssertionResult notMatchesWithOpenMP60(const Twine &Code,
+                                                const T &AMatcher) {
+  return matchesConditionally(Code, AMatcher, false,
+                              {"-fopenmp=libomp", "-fopenmp-version=60"});
 }
 
 template <typename T>

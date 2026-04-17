@@ -418,8 +418,9 @@ private:
         auto &E2List = static_cast<ErrorList &>(*E2Payload);
         for (auto &Payload : E2List.Payloads)
           E1List.Payloads.push_back(std::move(Payload));
-      } else
+      } else {
         E1List.Payloads.push_back(E2.takePayload());
+      }
 
       return E1;
     }
@@ -714,10 +715,11 @@ private:
     if (HasError) {
       dbgs() << "Unchecked Expected<T> contained error:\n";
       (*getErrorStorage())->log(dbgs());
-    } else
+    } else {
       dbgs() << "Expected<T> value was in success state. (Note: Expected<T> "
                 "values in success mode must still be checked prior to being "
                 "destroyed).\n";
+    }
     abort();
   }
 #endif
@@ -807,6 +809,29 @@ T cantFail(Expected<T> ValOrErr, const char *Msg = nullptr) {
 #endif
     llvm_unreachable(Msg);
   }
+}
+
+namespace detail {
+
+template <typename T>
+using compare_nullptr_t = decltype(std::declval<T &>() == nullptr);
+
+template <typename T>
+using is_nullptr_comparable = llvm::is_detected<compare_nullptr_t, T>;
+
+} // namespace detail
+
+/// Calls llvm_unreachable if Pointer is null, otherwise returns the
+/// pointer as is.
+template <typename T,
+          typename = std::enable_if_t<detail::is_nullptr_comparable<T>::value>>
+[[nodiscard]] decltype(auto) checkNotNull(
+    T &&Pointer,
+    const char *Msg = "Expected a non-null pointer but got a null pointer") {
+  assert(Msg);
+  if (Pointer != nullptr)
+    return std::forward<T>(Pointer);
+  llvm_unreachable(Msg);
 }
 
 /// Report a fatal error if ValOrErr is a failure value, otherwise unwraps and
@@ -1082,21 +1107,14 @@ inline void consumeError(Error Err) {
   handleAllErrors(std::move(Err), [](const ErrorInfoBase &) {});
 }
 
-/// Convert an Expected to an Optional without doing anything. This method
+/// Convert an Expected to an std::optional without doing anything. This method
 /// should be used only where an error can be considered a reasonable and
 /// expected return value.
 ///
 /// Uses of this method are potentially indicative of problems: perhaps the
 /// error should be propagated further, or the error-producer should just
-/// return an Optional in the first place.
+/// return an std::optional in the first place.
 template <typename T> std::optional<T> expectedToOptional(Expected<T> &&E) {
-  if (E)
-    return std::move(*E);
-  consumeError(E.takeError());
-  return std::nullopt;
-}
-
-template <typename T> std::optional<T> expectedToStdOptional(Expected<T> &&E) {
   if (E)
     return std::move(*E);
   consumeError(E.takeError());
@@ -1189,7 +1207,7 @@ private:
 /// (or Expected) and you want to call code that still returns
 /// std::error_codes.
 class LLVM_ABI ECError : public ErrorInfo<ECError> {
-  LLVM_ABI_FRIEND friend Error errorCodeToError(std::error_code);
+  LLVM_ABI friend Error errorCodeToError(std::error_code);
 
   void anchor() override;
 
@@ -1304,7 +1322,7 @@ inline Error createStringError(std::error_code EC, char const *Fmt,
                                const Ts &... Vals) {
   std::string Buffer;
   raw_string_ostream(Buffer) << format(Fmt, Vals...);
-  return make_error<StringError>(Buffer, EC);
+  return make_error<StringError>(std::move(Buffer), EC, true);
 }
 
 LLVM_ABI Error createStringError(std::string &&Msg, std::error_code EC);
