@@ -519,6 +519,46 @@ struct MatMulOpLowering : public OpConversionPattern<toy::MatMulOp> {
 
 } // namespace.
 
+namespace {
+struct MapOpLowering : public OpConversionPattern<toy::MapOp> {
+  using OpConversionPattern<toy::MapOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(toy::MapOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
+    Location loc = op.getLoc();
+    Value input = adaptor.getInput();
+    auto inputMemRefType = llvm::cast<MemRefType>(input.getType());
+
+    auto resultTensorType = llvm::cast<RankedTensorType>(op.getResult().getType());
+    auto resultMemRefType = convertTensorToMemRef(resultTensorType);
+
+    Value alloc = insertAllocAndDealloc(resultMemRefType, loc, rewriter);
+
+    SmallVector<int64_t, 4> lowerBounds(inputMemRefType.getRank(), 0);
+    SmallVector<int64_t, 4> steps(inputMemRefType.getRank(), 1);
+
+    affine::buildAffineLoopNest(
+      rewriter, loc, lowerBounds, inputMemRefType.getShape(), steps,
+      [&] (OpBuilder &nestedBuilder, Location nestedLoc, ValueRange ivs) {
+        Value scalar = nestedBuilder.create<affine::AffineLoadOp>(nestedLoc, input, ivs);
+        auto fnCall = nestedBuilder.create<func::CallOp>(
+          nestedLoc,
+          rewriter.getF64Type(),
+          op.getCallee(),
+          ValueRange{scalar}
+        );
+        Value result = fnCall.getResult(0);
+        nestedBuilder.create<affine::AffineStoreOp>(nestedLoc, result, alloc, ivs);
+      }
+    );
+
+    rewriter.replaceOp(op, alloc);
+    return success();
+  }
+};
+}
+
 static SmallVector<Value, 4> projectBroadcastIndices(
   ArrayRef<int64_t> operandShape,
   ArrayRef<int64_t> resultShape,
@@ -683,7 +723,7 @@ void ToyToAffineLoweringPass::runOnOperation() {
   // the set of patterns that will lower the Toy operations.
   RewritePatternSet patterns(&getContext());
   patterns.add<AddOpLowering, ConstantOpLowering, FuncOpLowering, MulOpLowering, MatMulOpLowering,
-               PrintOpLowering, ReturnOpLowering, TransposeOpLowering, MaxOpLowering,
+               PrintOpLowering, ReturnOpLowering, TransposeOpLowering, MaxOpLowering, MapOpLowering,
                NegOpLowering, ReduceSumOpLowering, ReduceMaxOpLowering, ReluOpLowering>(
       &getContext());
 

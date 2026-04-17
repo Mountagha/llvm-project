@@ -505,6 +505,25 @@ private:
     llvm::StringRef callee = call.getCallee();
     auto location = loc(call.loc());
 
+    // map(fn, tensor) is special: the first arg is a function name, not a
+    // variable. Handle it before the generic operand codegen loop.
+    if (callee == "map") {
+      if (call.getArgs().size() != 2) {
+        emitError(location, "toy.map expects exactly 2 arguments (callee, input tensor).");
+        return nullptr;
+      }
+      auto *calleeExpr = llvm::dyn_cast<VariableExprAST>(call.getArgs()[0].get());
+      if (!calleeExpr) {
+        emitError(location, "toy.map first argument must be a function name.");
+        return nullptr;
+      }
+      mlir::Value input = mlirGen(*call.getArgs()[1]);
+      if (!input)
+        return nullptr;
+      auto calleeAttr = mlir::FlatSymbolRefAttr::get(builder.getContext(), calleeExpr->getName());
+      return builder.create<MapOp>(location, input.getType(), calleeAttr, input);
+    }
+
     // Codegen the operands first.
     SmallVector<mlir::Value, 4> operands;
     for (auto &expr : call.getArgs()) {
@@ -637,6 +656,7 @@ private:
           lhsType.getElementType());
       return builder.create<MatMulOp>(location, resultType, lhs, rhs);
     }
+
 
     // Otherwise this is a call to a user-defined function. Calls to
     // user-defined functions are mapped to a custom call that takes the callee
