@@ -18,6 +18,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/DialectRegistry.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/ValueRange.h"
 #include "mlir/Support/LLVM.h"
@@ -121,6 +122,7 @@ struct BinaryOpLowering : public ConversionPattern {
   LogicalResult
   matchAndRewrite(Operation *op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
+
     auto loc = op->getLoc();
     lowerOpToLoops(op, operands, rewriter,
                    [loc](OpBuilder &builder, ValueRange memRefOperands,
@@ -155,6 +157,7 @@ struct UnaryOpLowering : public ConversionPattern {
   LogicalResult
   matchAndRewrite(Operation *op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
+
     auto loc = op->getLoc();
     lowerOpToLoops(op, operands, rewriter,
                    [loc](OpBuilder &builder, ValueRange memRefOperands,
@@ -259,8 +262,15 @@ struct FuncOpLowering : public OpConversionPattern<toy::FuncOp> {
                   ConversionPatternRewriter &rewriter) const final {
     // We only lower the main function as we expect that all other functions
     // have been inlined.
-    if (op.getName() != "main")
+    if (op.getName() != "main") {
+      // Private functions are map callees — their body is inlined directly
+      // by MapOpLowering. Erase them here so they don't remain as illegal ops.
+      if (op.isPrivate()) {
+        rewriter.eraseOp(op);
+        return success();
+      }
       return failure();
+    }
 
     // Verify that the given main has no inputs and results.
     if (op.getNumArguments() || op.getFunctionType().getNumResults()) {
@@ -535,20 +545,51 @@ struct MapOpLowering : public OpConversionPattern<toy::MapOp> {
 
     Value alloc = insertAllocAndDealloc(resultMemRefType, loc, rewriter);
 
+    // Look up the callee toy.func so we can inline its body element-wise.
+    auto calleeFn = SymbolTable::lookupNearestSymbolFrom<toy::FuncOp>(
+        op, op.getCalleeAttr());
+    if (!calleeFn)
+      return op.emitOpError("map callee '") << op.getCallee() << "' not found";
+
     SmallVector<int64_t, 4> lowerBounds(inputMemRefType.getRank(), 0);
     SmallVector<int64_t, 4> steps(inputMemRefType.getRank(), 1);
 
     affine::buildAffineLoopNest(
       rewriter, loc, lowerBounds, inputMemRefType.getShape(), steps,
-      [&] (OpBuilder &nestedBuilder, Location nestedLoc, ValueRange ivs) {
+      [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange ivs) {
+        // Load the scalar element at this iteration point.
         Value scalar = nestedBuilder.create<affine::AffineLoadOp>(nestedLoc, input, ivs);
-        auto fnCall = nestedBuilder.create<func::CallOp>(
-          nestedLoc,
-          rewriter.getF64Type(),
-          op.getCallee(),
-          ValueRange{scalar}
-        );
-        Value result = fnCall.getResult(0);
+
+        // Inline the callee body element-wise. Map toy ops directly to their
+        // scalar arith equivalents — no cloning of toy ops with tensor types.
+        IRMapping mapping;
+        mapping.map(calleeFn.getBody().front().getArgument(0), scalar);
+
+        for (auto &bodyOp : calleeFn.getBody().front().without_terminator()) {
+          Value opResult;
+          if (llvm::isa<toy::AddOp>(bodyOp)) {
+            Value lhs = mapping.lookup(bodyOp.getOperand(0));
+            Value rhs = mapping.lookup(bodyOp.getOperand(1));
+            opResult = nestedBuilder.create<arith::AddFOp>(nestedLoc, lhs, rhs);
+          } else if (llvm::isa<toy::MulOp>(bodyOp)) {
+            Value lhs = mapping.lookup(bodyOp.getOperand(0));
+            Value rhs = mapping.lookup(bodyOp.getOperand(1));
+            opResult = nestedBuilder.create<arith::MulFOp>(nestedLoc, lhs, rhs);
+          } else if (llvm::isa<toy::NegOp>(bodyOp)) {
+            Value input = mapping.lookup(bodyOp.getOperand(0));
+            opResult = nestedBuilder.create<arith::NegFOp>(nestedLoc, input);
+          } else {
+            op.emitOpError("map callee contains unsupported op: ")
+                << bodyOp.getName();
+            return;
+          }
+          mapping.map(bodyOp.getResult(0), opResult);
+        }
+        // toy.return operand holds the scalar result.
+        auto retOp = llvm::cast<toy::ReturnOp>(
+            calleeFn.getBody().front().getTerminator());
+        Value result = mapping.lookup(retOp.getOperand(0));
+
         nestedBuilder.create<affine::AffineStoreOp>(nestedLoc, result, alloc, ivs);
       }
     );

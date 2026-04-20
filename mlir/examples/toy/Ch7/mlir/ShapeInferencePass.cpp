@@ -60,6 +60,12 @@ struct ShapeInferencePass
   void runOnOperation() override {
     auto f = getOperation();
 
+    // Skip private functions — they are map callees that will be inlined
+    // directly into the loop body by MapOpLowering and do not need shape
+    // inference independently.
+    if (f.isPrivate())
+      return;
+
     // Populate the worklist with the operations that need shape inference:
     // these are operations that return a dynamic shape.
     llvm::SmallPtrSet<mlir::Operation *, 16> opWorklist;
