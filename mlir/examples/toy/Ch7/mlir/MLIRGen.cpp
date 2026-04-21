@@ -517,11 +517,48 @@ private:
         emitError(location, "toy.map first argument must be a function name.");
         return nullptr;
       }
+
+      llvm::StringRef calleeName = calleeExpr->getName();
+      FunctionAST *calleeFn = functionMap.lookup(calleeName);
+      if (!calleeFn) {
+        emitError(location, "map unknown callee '" + calleeName + "'");
+        return nullptr;
+      }
+
       mlir::Value input = mlirGen(*call.getArgs()[1]);
       if (!input)
         return nullptr;
-      auto calleeAttr = mlir::FlatSymbolRefAttr::get(builder.getContext(), calleeExpr->getName());
-      return builder.create<MapOp>(location, input.getType(), calleeAttr, input);
+      
+      // Determine result type (same shape as input - shape inference will confirm)
+      auto inputType = llvm::cast<mlir::RankedTensorType>(input.getType());
+
+      // Build the mapOp.
+      auto mapOp = builder.create<MapOp>(location, inputType, calleeAttr, input);
+
+      // 6. Populate the region body
+      // saveInsertionPoint so we can restore after building the region
+      mlir::Block *block = mapOp.addEntryBlock();
+      {
+        mlir::OpBuilder::InsertionGuard guard(builder);
+        builder.setInsertionPointToStart(block);
+
+        // Map callee's single VarDecl argument -> the block argument %x
+        mlir::BlockArgument blockArg = block->getArgument(0);
+        llvm::StringRef argName = calleeFn->getProto()->getArgs()[0];
+        symbolTable.insert(argName, blockArg);  // scoped: push/pop around this block
+
+        // Emit callee body ops (these emit toy.add toy.mul, etc. into the region)
+        mlir::Value bodyResult = mlirGen(*calleeFn->getBody());
+        if (!bodyResult)
+          return nullptr;
+        
+        // Emit toy.yield with the scalar result
+        builder.create<toy::YieldOp>(loc, bodyResult);
+
+        symbolTable.erase(argName); // Pop callee arg from scope
+      }
+
+      return mapOp.getResult();
     }
 
     // Codegen the operands first.

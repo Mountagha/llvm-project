@@ -687,47 +687,86 @@ void MatMulOp::inferShapes() {
 }
 
 mlir::LogicalResult MapOp::verify() {
-  // 1. Look up the callee in the symbol table 
-  // Note: verify() doesn't receive a SymbolTableCollection, so use
-  // the static SymbolTable::lookupNearestSymbolFrom instead.
+    
+  // Check Region has exactly 1 block
+  Region &region = getBody();
+  if (region.empty() || !region.hasOneBlock()) {
+    return emitOpError() << "Region must have exactly 1 block.";
+  } 
 
-  auto fn = mlir::SymbolTable::lookupNearestSymbolFrom<toy::FuncOp>(
-    *this, getCalleeAttr());  // getCalleeAttr() returns the FlatSymbolRefAtt
-  
-  if (!fn)
-    return emitOpError() << "'" << getCallee()
-                        << "' does not reference a valid function.";
+  // Access the entry block
+  Block &block = region.front();
+  if (block.getNumArguments() != 1) {
+    return emitOpError() << "Block argument must have exactly 1 arguments";
+  }
 
-  // 2. Check the callee has exactly 1 argument.
-  auto fnType = fn.getFunctionType();
-  if (fnType.getNumInputs() != 1)
-    return emitOpError() << "callee '" << getCallee() 
-                        << "' must take exactly 1 argument but has "
-                        << fnType.getNumInputs();
+  if (!block.getArgument(0).getType().isF64()) {
+    return emitOpError() << "Block argument type must be f64.";
+  }
 
-  // 3. Check the argument type is f64 or a tensor of f64.
-  auto f64 = mlir::Float64Type::get(getContext());
-  auto argType = fnType.getInput(0);
-  bool argIsF64 = argType == f64;
-  bool argIsTensorOfF64 = llvm::isa<mlir::TensorType>(argType) &&
-                          llvm::cast<mlir::TensorType>(argType).getElementType() == f64;
-  if (!argIsF64 && !argIsTensorOfF64)
-    return emitOpError() << "callee argument must be f64 or tensor<f64>, but got "
-                         << argType;
-
-  // 4. Check the callee returns exactly 1 result of f64 or tensor of f64.
-  auto retType = fnType.getResult(0);
-  bool retIsF64 = retType == f64;
-  bool retIsTensorOfF64 = llvm::isa<mlir::TensorType>(retType) &&
-                          llvm::cast<mlir::TensorType>(retType).getElementType() == f64;
-  if (fnType.getNumResults() != 1 || (!retIsF64 && !retIsTensorOfF64))
-    return emitOpError() << "callee must return exactly one f64 or tensor<f64> result";
-
+  Operation* terminator = block.getTerminator();
+  if (!llvm::isa<toy::YieldOp>(block.getTerminator())) {
+    return emitOpError() << "Expect a yieldOp terminator, got"
+                        << *block.getTerminator();
+  }
   return success();
 }
 
 void MapOp::inferShapes() {
   getResult().setType(getInput().getType());
+}
+
+void MapOp::print(OpAsmPrinter &p) {
+  // 1. Print input operand and type: `(%input: tensor<2x3xf64>)
+  p << "(";
+  p.printOperand(getInput());
+  p << " : ";
+  p.printType(getInput().getType());
+  p << ")";
+
+  // 2. Print result type: ` -> tensor<2x3xf64>
+  p << " -> ";
+  p.printType(getResult().getType());
+
+  // 3. Print the region (printer handles blocks args abd body automatically)
+  p << " ";
+  p.printRegion(getBody(),
+    /*printEntryBlockArgs*/true,
+    /*printBlockTerminators*/true);
+}
+
+ParseResult MapOp::parse(OpAsmParser &parser, OperationState &result) {
+  
+  OpAsmParser::UnresolvedOperand inputOperand;
+  mlir::Type inputType, resultType;
+
+  if (parser.parseLParen() ||
+      parser.parseOperand(inputOperand) ||
+      parser.parseColonType(inputType) ||
+      parser.parseRParen())
+    return failure();
+  
+  if (parser.parseArrow() || parser.parseType(resultType))
+    return failure();
+
+  if (parser.resolveOperand(inputOperand, inputType, result.operands))
+    return failure();
+  
+    result.addTypes(resultType);
+
+    auto tensorType = llvm::dyn_cast<mlir::RankedTensorType>(inputType);
+    if (!tensorType)
+      return parser.emitError(parser.getNameLoc(), "expected ranked tensor input type");
+
+    OpAsmParser::Argument blockArg;
+    blockArg.type = tensorType.getElementType();
+
+    mlir::Region *body = result.addRegion();
+    if (parser.parseRegion(*body, {blockArg}))
+      return failure();
+
+    return success();
+
 }
 
 //===----------------------------------------------------------------------===//

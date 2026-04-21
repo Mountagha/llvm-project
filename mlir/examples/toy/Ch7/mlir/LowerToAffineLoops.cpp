@@ -543,13 +543,7 @@ struct MapOpLowering : public OpConversionPattern<toy::MapOp> {
     auto resultTensorType = llvm::cast<RankedTensorType>(op.getResult().getType());
     auto resultMemRefType = convertTensorToMemRef(resultTensorType);
 
-    Value alloc = insertAllocAndDealloc(resultMemRefType, loc, rewriter);
-
-    // Look up the callee toy.func so we can inline its body element-wise.
-    auto calleeFn = SymbolTable::lookupNearestSymbolFrom<toy::FuncOp>(
-        op, op.getCalleeAttr());
-    if (!calleeFn)
-      return op.emitOpError("map callee '") << op.getCallee() << "' not found";
+    Value output = insertAllocAndDealloc(resultMemRefType, loc, rewriter);
 
     SmallVector<int64_t, 4> lowerBounds(inputMemRefType.getRank(), 0);
     SmallVector<int64_t, 4> steps(inputMemRefType.getRank(), 1);
@@ -563,38 +557,23 @@ struct MapOpLowering : public OpConversionPattern<toy::MapOp> {
         // Inline the callee body element-wise. Map toy ops directly to their
         // scalar arith equivalents — no cloning of toy ops with tensor types.
         IRMapping mapping;
-        mapping.map(calleeFn.getBody().front().getArgument(0), scalar);
+        Block &body = op.getRegion().front();
+        mapping.map(body.getArgument(0), scalar);
 
-        for (auto &bodyOp : calleeFn.getBody().front().without_terminator()) {
-          Value opResult;
-          if (llvm::isa<toy::AddOp>(bodyOp)) {
-            Value lhs = mapping.lookup(bodyOp.getOperand(0));
-            Value rhs = mapping.lookup(bodyOp.getOperand(1));
-            opResult = nestedBuilder.create<arith::AddFOp>(nestedLoc, lhs, rhs);
-          } else if (llvm::isa<toy::MulOp>(bodyOp)) {
-            Value lhs = mapping.lookup(bodyOp.getOperand(0));
-            Value rhs = mapping.lookup(bodyOp.getOperand(1));
-            opResult = nestedBuilder.create<arith::MulFOp>(nestedLoc, lhs, rhs);
-          } else if (llvm::isa<toy::NegOp>(bodyOp)) {
-            Value input = mapping.lookup(bodyOp.getOperand(0));
-            opResult = nestedBuilder.create<arith::NegFOp>(nestedLoc, input);
-          } else {
-            op.emitOpError("map callee contains unsupported op: ")
-                << bodyOp.getName();
-            return;
-          }
-          mapping.map(bodyOp.getResult(0), opResult);
+        for (Operation &innerOp : body.without_terminator()) {
+          nestedBuilder.clone(innerOp, mapping);
         }
-        // toy.return operand holds the scalar result.
-        auto retOp = llvm::cast<toy::ReturnOp>(
-            calleeFn.getBody().front().getTerminator());
-        Value result = mapping.lookup(retOp.getOperand(0));
 
-        nestedBuilder.create<affine::AffineStoreOp>(nestedLoc, result, alloc, ivs);
-      }
-    );
+        auto yield = llvm::cast<toy::YieldOp>(body.getTerminator());
+        Value yielded = mapping.lookup(yield.getOperand());
 
-    rewriter.replaceOp(op, alloc);
+        nestedBuilder.create<affine::AffineStoreOp>(
+          nestedLoc, yielded, output, ivs
+        );
+      });
+    
+    // 6. Replace op wit output memref
+    rewriter.replaceOp(op, output);
     return success();
   }
 };

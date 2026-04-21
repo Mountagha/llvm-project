@@ -579,30 +579,27 @@ def MatMulOp : Toy_Op<"matmul", [Pure, DeclareOpInterfaceMethods<ShapeInferenceO
 def MapOp : Toy_Op<"map", [Pure, DeclareOpInterfaceMethods<ShapeInferenceOpInterface>]> {
   let summary = "element-wise map of a function over a tensor.";
   let description = [{
-    mapOp maps each element of a given tensor to a function provided as a parameter.
-    Input:
-      %a : tensor<2x3xf64>
-      @double : (f64) -> f64
-
-      map will apply @double to every element of %a
-      %b = toy.map @double(%a) : tensor<2x3xf64> -> tensor<2x3xf64>
-
-      which is semantically equivalent to 
-      for each index [i, j]:
-        %b[i, j] = @double(%a[i, j])
+    mapOp maps each element of a given tensor to a region.
+    eg:
+    toy.map(%input) : tensor<2x3xf64> -> tensor<2x3xf64> {
+    ^bb0(%x : f64):
+      %r = toy.add %x %x : f64
+      toy.yield %r : f64
+    }
   }];
 
-  let arguments = (ins
-      FlatSymbolRefAttr:$callee,
-      F64Tensor:$input);
+  let arguments = (ins F64Tensor:$input);
   let results = (outs F64Tensor:$result);
-
+  let regions = (region SizedRegion<1>:$body);
+  
+  let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
   
-  let assemblyFormat = [{
-    $callee `(` $input `)` attr-dict `:` type($input) `->` type($result)
-  }];
+}
 
+def YieldOp : Toy_Op<"yield", [Pure, Terminator]> {
+  let arguments = (ins F64:$value);
+  let assemblyFormat = "$value attr-dict `:` type($value)";
 }
 
 #endif // TOY_OPS
