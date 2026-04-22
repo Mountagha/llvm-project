@@ -34,6 +34,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
@@ -703,6 +704,9 @@ mlir::LogicalResult MapOp::verify() {
   if (!block.getArgument(0).getType().isF64()) {
     return emitOpError() << "Block argument type must be f64.";
   }
+
+  llvm::errs() << "[map-verify] terminator seen: "
+               << block.getTerminator()->getName() << "\n";
 
   if (!llvm::isa<toy::YieldOp>(block.getTerminator())) {
     return emitOpError() << "Expect a yieldOp terminator, got "

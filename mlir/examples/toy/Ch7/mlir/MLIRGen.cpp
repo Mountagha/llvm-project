@@ -33,6 +33,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/raw_ostream.h"
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
@@ -382,6 +383,10 @@ private:
         return mlir::failure();
     }
 
+    llvm::errs() << "[return-emitter] creating toy.return at ";
+    location.print(llvm::errs());
+    llvm::errs() << "\n";
+
     // Otherwise, this return operation has zero operands.
     builder.create<ReturnOp>(location,
                              expr ? ArrayRef(expr) : ArrayRef<mlir::Value>());
@@ -539,15 +544,24 @@ private:
 
       // Build the mapOp.
       auto mapOp = builder.create<MapOp>(location, inputType, input);
-      mlir::Region &body = mapOp.getBody();
-      mlir::Block *block = builder.createBlock(&body);
-      auto elementType = inputType.getElementType();
-      auto blockArg = block->addArgument(elementType, location);
-
+      /*
+      llvm::errs() << "[map] block created, terminator now: ";
+      if (!block->empty())
+        block->back().print(llvm::errs());
+      else
+        llvm::errs() << "<none>";
+      llvm::errs() << "\n";
+      */
       // 6. Populate the region body
       // saveInsertionPoint so we can restore after building the region
       {
         mlir::OpBuilder::InsertionGuard guard(builder);
+
+        mlir::Region &body = mapOp.getBody();
+        mlir::Block *block = builder.createBlock(&body);
+        auto elementType = inputType.getElementType();
+        auto blockArg = block->addArgument(elementType, location);
+
         builder.setInsertionPointToStart(block);
         SymbolTableScopeT scope(symbolTable);
 
@@ -577,6 +591,15 @@ private:
         
         // Emit toy.yield with the scalar result
         builder.create<YieldOp>(location, bodyResult);
+
+        llvm::errs() << "[map] after yield, terminator: ";
+        if (!block->empty())
+          block->back().print(llvm::errs());
+        else
+          llvm::errs() << "<none>";
+        llvm::errs() << "\n[map] block dump:\n";
+        block->print(llvm::errs());
+        llvm::errs() << "\n";
 
       }
       return mapOp.getResult();
