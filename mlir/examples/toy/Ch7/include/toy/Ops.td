@@ -594,7 +594,6 @@ def MapOp : Toy_Op<"map", [Pure, DeclareOpInterfaceMethods<ShapeInferenceOpInter
   
   let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
-  
 }
 
 def YieldOp : Toy_Op<"yield", [Pure, Terminator]> {

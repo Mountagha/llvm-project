@@ -263,12 +263,6 @@ struct FuncOpLowering : public OpConversionPattern<toy::FuncOp> {
     // We only lower the main function as we expect that all other functions
     // have been inlined.
     if (op.getName() != "main") {
-      // Private functions are map callees — their body is inlined directly
-      // by MapOpLowering. Erase them here so they don't remain as illegal ops.
-      if (op.isPrivate()) {
-        rewriter.eraseOp(op);
-        return success();
-      }
       return failure();
     }
 

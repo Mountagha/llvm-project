@@ -75,6 +75,8 @@ public:
 
     for (auto &record : moduleAST) {
       if (FunctionAST *funcAST = llvm::dyn_cast<FunctionAST>(record.get())) {
+        // Store AST reference for later lookup.
+        FunctionASTMap.insert({funcAST->getProto()->getName(), funcAST});
         mlir::toy::FuncOp func = mlirGen(*funcAST);
         if (!func)
           return nullptr;
@@ -119,6 +121,9 @@ private:
 
   /// A mapping for the functions that have been code generated to MLIR.
   llvm::StringMap<mlir::toy::FuncOp> functionMap;
+
+  /// A mapping for the functions AST.
+  llvm::StringMap<FunctionAST *> FunctionASTMap;
 
   /// A mapping for named struct types to the underlying MLIR type and the
   /// original AST node.
@@ -519,7 +524,7 @@ private:
       }
 
       llvm::StringRef calleeName = calleeExpr->getName();
-      FunctionAST *calleeFn = functionMap.lookup(calleeName);
+      FunctionAST *calleeFn = FunctionASTMap.lookup(calleeName);
       if (!calleeFn) {
         emitError(location, "map unknown callee '" + calleeName + "'");
         return nullptr;
@@ -533,31 +538,47 @@ private:
       auto inputType = llvm::cast<mlir::RankedTensorType>(input.getType());
 
       // Build the mapOp.
-      auto mapOp = builder.create<MapOp>(location, inputType, calleeAttr, input);
+      auto mapOp = builder.create<MapOp>(location, inputType, input);
+      mlir::Region &body = mapOp.getBody();
+      mlir::Block *block = builder.createBlock(&body);
+      auto elementType = inputType.getElementType();
+      auto blockArg = block->addArgument(elementType, location);
 
       // 6. Populate the region body
       // saveInsertionPoint so we can restore after building the region
-      mlir::Block *block = mapOp.addEntryBlock();
       {
         mlir::OpBuilder::InsertionGuard guard(builder);
         builder.setInsertionPointToStart(block);
+        SymbolTableScopeT scope(symbolTable);
 
         // Map callee's single VarDecl argument -> the block argument %x
-        mlir::BlockArgument blockArg = block->getArgument(0);
-        llvm::StringRef argName = calleeFn->getProto()->getArgs()[0];
-        symbolTable.insert(argName, blockArg);  // scoped: push/pop around this block
+        llvm::StringRef argName = calleeFn->getProto()->getArgs()[0]->getName();
+        symbolTable.insert(argName, {blockArg, nullptr});  // scoped: push/pop around this block
 
+        auto emitMapCalleeReturn = [&] () -> mlir::Value {
+          ExprASTList *body = calleeFn->getBody();
+          if (!body || body->empty()) {
+            emitError(location, "map callee body is empty");
+            return nullptr;
+          }
+
+          auto *ret = llvm::dyn_cast<ReturnExprAST>(body->back().get());
+          if (!ret || !ret->getExpr().has_value()) {
+            emitError(location, "map callee must end with 'return <expr>'");
+            return nullptr;
+          }
+
+          return mlirGen(**ret->getExpr());
+        };       
         // Emit callee body ops (these emit toy.add toy.mul, etc. into the region)
-        mlir::Value bodyResult = mlirGen(*calleeFn->getBody());
+        mlir::Value bodyResult = emitMapCalleeReturn();
         if (!bodyResult)
           return nullptr;
         
         // Emit toy.yield with the scalar result
-        builder.create<toy::YieldOp>(loc, bodyResult);
+        builder.create<YieldOp>(location, bodyResult);
 
-        symbolTable.erase(argName); // Pop callee arg from scope
       }
-
       return mapOp.getResult();
     }
 

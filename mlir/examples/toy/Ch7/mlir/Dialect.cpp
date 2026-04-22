@@ -704,9 +704,8 @@ mlir::LogicalResult MapOp::verify() {
     return emitOpError() << "Block argument type must be f64.";
   }
 
-  Operation* terminator = block.getTerminator();
   if (!llvm::isa<toy::YieldOp>(block.getTerminator())) {
-    return emitOpError() << "Expect a yieldOp terminator, got"
+    return emitOpError() << "Expect a yieldOp terminator, got "
                         << *block.getTerminator();
   }
   return success();
