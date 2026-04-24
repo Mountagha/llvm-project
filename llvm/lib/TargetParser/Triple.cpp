@@ -50,6 +50,10 @@ StringRef Triple::getArchTypeName(ArchType Kind) {
     return "bpfeb";
   case bpfel:
     return "bpfel";
+  case cpu0:
+    return "cpu0";
+  case cpu0el:
+    return "cpu0el";
   case csky:
     return "csky";
   case dxil:
@@ -255,6 +259,10 @@ StringRef Triple::getArchTypePrefix(ArchType Kind) {
 
   case avr:
     return "avr";
+
+  case cpu0:
+  case cpu0el:
+    return "cpu0";
 
   case ppc64:
   case ppc64le:
@@ -667,6 +675,8 @@ Triple::ArchType Triple::getArchTypeForLLVMName(StringRef Name) {
       .Case("armeb", armeb)
       .Case("avr", avr)
       .StartsWith("bpf", BPFArch)
+      .Case("cpu0", cpu0)
+      .Case("cpu0el", cpu0el)
       .Case("m68k", m68k)
       .Case("mips", mips)
       .Case("mipsel", mipsel)
@@ -821,6 +831,8 @@ Triple::ArchType Triple::parseArch(StringRef ArchName) {
           .Case("avr", Triple::avr)
           .Case("m68k", Triple::m68k)
           .Case("msp430", Triple::msp430)
+          .Cases({"cpu0", "cpu0eeb", "cpu0allregex"}, Triple::cpu0)
+          .Cases({"cpu0el", "Cpu0allegrexel"}, Triple::cpu0el)
           .Cases({"mips", "mipseb", "mipsallegrex", "mipsisa32r6", "mipsr6"},
                  Triple::mips)
           .Cases({"mipsel", "mipsallegrexel", "mipsisa32r6el", "mipsr6el"},
@@ -1203,6 +1215,8 @@ static Triple::ObjectFormatType getDefaultFormat(const Triple &T) {
   case Triple::bpfeb:
   case Triple::bpfel:
   case Triple::csky:
+  case Triple::cpu0:
+  case Triple::cpu0el:
   case Triple::hexagon:
   case Triple::hsail64:
   case Triple::hsail:
@@ -1947,6 +1961,8 @@ unsigned Triple::getArchPointerBitWidth(llvm::Triple::ArchType Arch) {
   case llvm::Triple::arm:
   case llvm::Triple::armeb:
   case llvm::Triple::csky:
+  case llvm::Triple::cpu0:
+  case llvm::Triple::cpu0el:
   case llvm::Triple::dxil:
   case llvm::Triple::hexagon:
   case llvm::Triple::hsail:
@@ -2058,6 +2074,8 @@ Triple Triple::get32BitArchVariant() const {
   case Triple::arm:
   case Triple::armeb:
   case Triple::csky:
+  case Triple::cpu0:
+  case Triple::cpu0el:
   case Triple::dxil:
   case Triple::hexagon:
   case Triple::hsail:
