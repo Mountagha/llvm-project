@@ -7,3 +7,6 @@ cmake -S ../llvm \
   -DLLVM_ENABLE_PROJECTS="clang" \
   -DLLVM_TARGETS_TO_BUILD="" \
   -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="Cpu0"
+
+
+  ninja -C build-cpu0-debug -j1 llc llvm-mc llvm-tblgen LLVMCpu0CodeGen LLVMCpu0Desc LLVMCpu0Info

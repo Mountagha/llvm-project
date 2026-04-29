@@ -1,4 +1,4 @@
-; ModuleID = 'ch3.bc'
+; ModuleID = '../Cpu0examples/ch3.bc'
 source_filename = "ch3.cpp"
 target datalayout = "E-m:m-p:32:32-i8:8:32-i16:16:32-i64:64-n32-S64"
 target triple = "mips-unknown-linux-gnu"

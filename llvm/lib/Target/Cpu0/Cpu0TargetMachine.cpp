@@ -24,7 +24,9 @@ Cpu0TargetMachine::Cpu0TargetMachine(
     std::optional<CodeModel::Model> CM, CodeGenOptLevel OL, bool /*JIT*/)
     : CodeGenTargetMachineImpl(T, computeDataLayout(TT), TT, CPU, FS, Options,
                               RM.value_or(Reloc::Static),
-                              CM.value_or(CodeModel::Small), OL) {}
+                              CM.value_or(CodeModel::Small), OL) {
+  initAsmInfo();
+}
 
 extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeCpu0Target() {
   RegisterTargetMachine<Cpu0TargetMachine> X(TheCpu0Target);
