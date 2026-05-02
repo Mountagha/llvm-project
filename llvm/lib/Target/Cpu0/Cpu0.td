@@ -16,6 +16,7 @@ def FeatureCpu032II : SubtargetFeature<"cpu032II", "Cpu0ArchVersion",
 
 include "Cpu0Schedule.td"
 include "Cpu0InstrInfo.td"
+include "Cpu0CallingConv.td"
 
 defm : RemapAllTargetPseudoPointerOperands<GPROut>;
 
