@@ -3,22 +3,20 @@
 #ifndef LLVM_LIB_TARGET_CPU0_MCTARGETDESC_CPU0ABIINFO_H
 #define LLVM_LIB_TARGET_CPU0_MCTARGETDESC_CPU0ABIINFO_H
 
-#include "Cpu0Config.h"
-
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/Triple.h"
+#include "llvm/TargetParser/Triple.h"
 #include "llvm/IR/CallingConv.h"
 #include "llvm/MC/MCRegisterInfo.h"
 
 namespace llvm {
 
-class MCTArgetOptions;
+class MCTargetOptions;
 class StringRef;
 class TargetRegisterClass;
 
 class Cpu0ABIInfo {
 public:
-    enum class ABI { Unknown, 032, S32 };
+    enum class ABI { Unknown, O32, S32 };
 
 protected:
     ABI ThisABI;
@@ -26,7 +24,7 @@ public:
     Cpu0ABIInfo(ABI ThisABI) : ThisABI(ThisABI) {}
 
     static Cpu0ABIInfo Unknown() { return Cpu0ABIInfo(ABI::Unknown); }
-    static Cpu0ABIInfo 032() { return Cpu0ABIInfo(ABI::032); }
+    static Cpu0ABIInfo O32() { return Cpu0ABIInfo(ABI::O32); }
     static Cpu0ABIInfo S32() { return Cpu0ABIInfo(ABI::S32); }
 
     bool IsKnown() const { return ThisABI != ABI::Unknown; }
@@ -57,5 +55,10 @@ public:
 
     unsigned GetEhDataReg(unsigned I) const;
     int EhDataRegSize() const;
-}
-}
+
+    static Cpu0ABIInfo computeTargetABI();
+};
+
+} // namespace llvm
+
+#endif

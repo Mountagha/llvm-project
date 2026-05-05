@@ -35,7 +35,7 @@ using namespace llvm;
 
 const char *Cpu0TargetLowering::getTargetNodeName(unsigned Opcode) const {
     switch(Opcode) {
-        case Cpu0ISD::JmpLink:           return "Cpu0ISD::JmpLink";
+        case Cpu0ISD::JumpLink:          return "Cpu0ISD::JumpLink";
         case Cpu0ISD::TailCall:          return "Cpu0ISD::TailCall";
         case Cpu0ISD::Hi:                return "Cpu0ISD::Hi";
         case Cpu0ISD::Lo:                return "Cpu0ISD::Lo";

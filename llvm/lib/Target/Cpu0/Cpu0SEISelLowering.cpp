@@ -25,7 +25,7 @@ using namespace llvm;
 
 static cl::opt<bool>
 EnableCpu0TailCalls("enable-cpu0-tail-calls", cl::Hidden,
-                    cl::desc("CPU0: Enable tail calls."), cl::init(false))
+                    cl::desc("CPU0: Enable tail calls."), cl::init(false));
 
 Cpu0SETargetLowering::Cpu0SETargetLowering(const Cpu0TargetMachine &TM,
                                             const Cpu0Subtarget &STI)

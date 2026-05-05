@@ -19,7 +19,7 @@ public:
         : TargetFrameLowering(StackGrowsDown, Align(Alignment), 0, Align(Alignment)), STI(sti) {}
     static const Cpu0FrameLowering *create(const Cpu0Subtarget &ST);
 
-    bool hasFP(const MachineFunction &MF) const override;
+    bool hasFPImpl(const MachineFunction &MF) const override;
 };
 
 /// Create Cpu0FrameLowering objects.

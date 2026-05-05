@@ -2,6 +2,7 @@
 
 #include "Cpu0Subtarget.h"
 #include "llvm/CodeGen/MachineInstr.h"
+#include "llvm/CodeGen/TargetOpcodes.h"
 
 using namespace llvm;
 
@@ -12,7 +13,8 @@ using namespace llvm;
 void Cpu0InstrInfo::anchor() {}
 
 Cpu0InstrInfo::Cpu0InstrInfo(const Cpu0Subtarget &STI)
-    : Cpu0GenInstrInfo(), Subtarget(STI) {}
+  : 
+    Subtarget(STI) {}
 
 const Cpu0InstrInfo *Cpu0InstrInfo::create(Cpu0Subtarget &STI) {
   return llvm::createCpu0SEInstrInfo(STI);

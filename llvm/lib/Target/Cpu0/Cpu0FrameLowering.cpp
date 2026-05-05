@@ -80,15 +80,15 @@ const Cpu0FrameLowering *Cpu0FrameLowering::create(const Cpu0Subtarget &ST) {
   return llvm::createCpu0SEFrameLowering(ST);
 }
 
-// hasFP - Return true if the specified function should have a dedicated frame
+// hasFPImpl - Return true if the specified function should have a dedicated frame
 // pointer register.  This is true if the function has variable sized allocas,
 // if it needs dynamic stack realignment, if frame pointer elimination is
 // disabled, or if the frame address is taken.
-bool Cpu0FrameLowering::hasFP(const MachineFunction &MF) const {
+bool Cpu0FrameLowering::hasFPImpl(const MachineFunction &MF) const {
   const MachineFrameInfo &MFI = MF.getFrameInfo();
   const TargetRegisterInfo *TRI = STI.getRegisterInfo();
 
   return MF.getTarget().Options.DisableFramePointerElim(MF) ||
       MFI.hasVarSizedObjects() || MFI.isFrameAddressTaken() ||
-      TRI->needsStackRealignment(MF);
+      TRI->hasStackRealignment(MF);
 }

@@ -9,8 +9,6 @@
 #ifndef LLVM_LIB_TARGET_CPU0_CPU0SEISELLOWERING_H
 #define LLVM_LIB_TARGET_CPU0_CPU0SEISELLOWERING_H
 
-#include "Cpu0Config.h"
-
 #include "Cpu0ISelLowering.h"
 #include "Cpu0RegisterInfo.h"
 

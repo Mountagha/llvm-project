@@ -1,13 +1,14 @@
 //===---- Cpu0ABIInfo.cpp - Information about CPU0 ABI's ------------------===//
 
-#include "Cpu0Config.h"
-
 #include "Cpu0ABIInfo.h"
 #include "Cpu0RegisterInfo.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/MC/MCTargetOptions.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/ErrorHandling.h"
+
+#include <cassert>
 
 using namespace llvm;
 
@@ -17,15 +18,14 @@ EnableCpu0S32Calls("cpu0-s32-calls", cl::Hidden,
                     "), cl::init(false));
 
 namespace {
-static const MCPhysReg O32IntRegs[4] = {Cpu0::A0, Cpu0::A1};
-static const MCPhysReg S32IntRegs = {};
+static const MCPhysReg O32IntRegs[] = {Cpu0::A0, Cpu0::A1};
 }
 
 const ArrayRef<MCPhysReg> Cpu0ABIInfo::GetByValArgRegs() const {
   if (IsO32())
     return makeArrayRef(O32IntRegs);
   if (IsS32())
-    return makeArrayRef(S32IntRegs);
+    return ArrayRef<MCPhysReg>();
   llvm_unreachable("Unhandled ABI");
 }
 
@@ -33,7 +33,7 @@ const ArrayRef<MCPhysReg> Cpu0ABIInfo::GetVarArgRegs() const {
   if (IsO32())
     return makeArrayRef(O32IntRegs);
   if (IsS32())
-    return makeArrayRef(S32IntRegs);
+    return ArrayRef<MCPhysReg>();
   llvm_unreachable("Unhandled ABI");
 }
 
@@ -50,9 +50,9 @@ Cpu0ABIInfo Cpu0ABIInfo::computeTargetABI() {
   Cpu0ABIInfo abi(ABI::Unknown);
 
   if (EnableCpu0S32Calls)
-    abi = ABI::S32;
+    abi = Cpu0ABIInfo::S32();
   else
-    abi = ABI::O32;
+    abi = Cpu0ABIInfo::O32();
   // Assert exactly one ABI was chosen.
   assert(abi.ThisABI != ABI::Unknown);
 

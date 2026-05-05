@@ -8,8 +8,6 @@
 #ifndef LLVM_LIB_TARGET_CPU0_CPU0MACHINEFUNCTION_H
 #define LLVM_LIB_TARGET_CPU0_CPU0MACHINEFUNCTION_H
 
-#include "Cpu0Config.h"
-
 #include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineMemOperand.h"
@@ -25,14 +23,14 @@ class Cpu0FunctionInfo : public MachineFunctionInfo {
 public:
     Cpu0FunctionInfo(MachineFunction &MF)
     : MF(MF),
-    varArgsFrameIndex(0),
+    VarArgsFrameIndex(0),
     MaxCallFrameSize(0)
     {}
 
     ~Cpu0FunctionInfo();
 
-    int getVarArgsFrameIndex() const { return varArgsFrameIndex; }
-    void setVargArgsFrameIndex(int Index) { varArgsFrameIndex = Index; }
+    int getVarArgsFrameIndex() const { return VarArgsFrameIndex; }
+    void setVargArgsFrameIndex(int Index) { VarArgsFrameIndex = Index; }
 private:
     virtual void anchor();
 

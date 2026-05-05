@@ -13,7 +13,7 @@ namespace llvm {
 class Cpu0Subtarget;
 
 class Cpu0InstrInfo : public Cpu0GenInstrInfo {
-    void anchor() override;
+    virtual void anchor();
 
 protected:
     const Cpu0Subtarget &Subtarget;

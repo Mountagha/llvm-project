@@ -35,7 +35,7 @@ protected:
     // HasSlt - slt instructions.
     bool HasSlt;
 
-    InstrItinerayData InstrItins;
+    InstrItineraryData InstrItins;
 
     const Cpu0TargetMachine &TM;
 

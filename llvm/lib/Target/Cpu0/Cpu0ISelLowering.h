@@ -10,8 +10,6 @@
 #ifndef LLVM_LIB_TARGET_CPU0_CPU0ISELLOWERING_H
 #define LLVM_LIB_TARGET_CPU0_CPU0ISELLOWERING_H
 
-#include "Cpu0Config.h"
-
 #include "MCTargetDesc/Cpu0ABIInfo.h"
 #include "Cpu0.h"
 #include "llvm/CodeGen/CallingConvLower.h"
