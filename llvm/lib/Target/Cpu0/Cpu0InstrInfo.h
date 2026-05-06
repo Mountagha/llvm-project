@@ -19,7 +19,8 @@ protected:
     const Cpu0Subtarget &Subtarget;
 
 public:
-    explicit Cpu0InstrInfo(const Cpu0Subtarget &STI);
+    Cpu0InstrInfo(const Cpu0Subtarget &STI, const Cpu0RegisterInfo &RI,
+                  unsigned ReturnOpcode);
 
     static const Cpu0InstrInfo *create(Cpu0Subtarget &STI);
 
@@ -30,7 +31,7 @@ public:
     virtual const Cpu0RegisterInfo &getRegisterInfo() const = 0;
 
     /// Return the number of bytes of code the specified instruction may be.
-    unsigned getInstSizeInBytes(const MachineInstr &MI) const;
+    unsigned getInstSizeInBytes(const MachineInstr &MI) const override;
 };
 
 const Cpu0InstrInfo *createCpu0SEInstrInfo(const Cpu0Subtarget &STI);

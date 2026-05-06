@@ -46,7 +46,7 @@ public:
 
     const Cpu0Subtarget *getSubtargetImpl(const Function &F) const override;
 
-    TargetPassConfig *createPassConfig(PassManagerBase &PM);
+    TargetPassConfig *createPassConfig(legacy::PassManagerBase &PM) override;
 
     TargetLoweringObjectFile *getObjFileLowering() const override {
         return TLOF.get();

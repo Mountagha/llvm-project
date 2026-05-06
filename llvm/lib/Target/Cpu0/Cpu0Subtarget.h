@@ -1,3 +1,6 @@
+#ifndef LLVM_LIB_TARGET_CPU0_CPU0SUBTARGET_H
+#define LLVM_LIB_TARGET_CPU0_CPU0SUBTARGET_H
+
 #include "Cpu0FrameLowering.h"
 #include "Cpu0ISelLowering.h"
 #include "Cpu0InstrInfo.h"
@@ -103,3 +106,5 @@ public:
 };
 
 }   // end llvm namespace.
+
+#endif

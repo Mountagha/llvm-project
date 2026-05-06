@@ -12,9 +12,11 @@ using namespace llvm;
 // Pin the vtable to this file.
 void Cpu0InstrInfo::anchor() {}
 
-Cpu0InstrInfo::Cpu0InstrInfo(const Cpu0Subtarget &STI)
-  : 
-    Subtarget(STI) {}
+Cpu0InstrInfo::Cpu0InstrInfo(const Cpu0Subtarget &STI,
+                             const Cpu0RegisterInfo &RI,
+                             unsigned ReturnOpcode)
+  : Cpu0GenInstrInfo(STI, RI, 0, 0, 0, ReturnOpcode), // we got no Cpu::OPcode yet hence the 0's.
+      Subtarget(STI) {}
 
 const Cpu0InstrInfo *Cpu0InstrInfo::create(Cpu0Subtarget &STI) {
   return llvm::createCpu0SEInstrInfo(STI);

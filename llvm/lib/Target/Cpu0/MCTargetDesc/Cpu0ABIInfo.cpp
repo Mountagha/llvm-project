@@ -23,7 +23,7 @@ static const MCPhysReg O32IntRegs[] = {Cpu0::A0, Cpu0::A1};
 
 const ArrayRef<MCPhysReg> Cpu0ABIInfo::GetByValArgRegs() const {
   if (IsO32())
-    return makeArrayRef(O32IntRegs);
+    return ArrayRef<MCPhysReg>(O32IntRegs);
   if (IsS32())
     return ArrayRef<MCPhysReg>();
   llvm_unreachable("Unhandled ABI");
@@ -31,7 +31,7 @@ const ArrayRef<MCPhysReg> Cpu0ABIInfo::GetByValArgRegs() const {
 
 const ArrayRef<MCPhysReg> Cpu0ABIInfo::GetVarArgRegs() const {
   if (IsO32())
-    return makeArrayRef(O32IntRegs);
+    return ArrayRef<MCPhysReg>(O32IntRegs);
   if (IsS32())
     return ArrayRef<MCPhysReg>();
   llvm_unreachable("Unhandled ABI");

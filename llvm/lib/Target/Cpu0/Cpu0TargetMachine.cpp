@@ -105,6 +105,11 @@ Cpu0TargetMachine::getSubtargetImpl(const Function &F) const {
   return I.get();
 }
 
+TargetPassConfig *
+Cpu0TargetMachine::createPassConfig(legacy::PassManagerBase &PM) {
+  return new TargetPassConfig(*this, PM);
+}
+
 extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeCpu0Target() {
   RegisterTargetMachine<Cpu0ebTargetMachine> X(TheCpu0Target);
   RegisterTargetMachine<Cpu0elTargetMachine> Y(TheCpu0elTarget);
