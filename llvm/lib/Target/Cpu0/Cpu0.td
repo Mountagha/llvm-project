@@ -28,6 +28,11 @@ class Proc<string Name, list<SubtargetFeature> Features>
 def : Proc<"cpu032I",  [FeatureCpu032I]>;
 def : Proc<"cpu032II", [FeatureCpu032II]>;
 
+// Will generate Cpu0GenAsmWrite.inc included by Cpu0InstPrinter.cpp, contents
+//  as follows,
+// void Cpu0InstPrinter::printInstruction(const MCInst *MI, raw_ostream &O) {...}
+// const char *Cpu0InstPrinter::getRegisterName(unsigned RegNo) {...}
 def Cpu0 : Target {
+  // Def Cpu0InstrInfo : InstrInfo as before.
   let InstructionSet = Cpu0InstrInfo;
 }
