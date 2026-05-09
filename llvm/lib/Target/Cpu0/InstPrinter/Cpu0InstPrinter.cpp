@@ -12,6 +12,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/MC/MCExpr.h"
 #include "llvm/MC/MCInst.h"
+#include "llvm/MC/MCAsmInfo.h"
 #include "llvm/MC/MCInstrInfo.h"
 #include "llvm/MC/MCSymbol.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -23,10 +24,9 @@ using namespace llvm;
 #define PRINT_ALIAS_INSTR
 #include "Cpu0GenAsmWriter.inc"
 
-void Cpu0InstPrinter::printRegName(raw_ostream &OS, unsigned RegNo) const {
-//- getRegisterName(RegNo) defined in Cpu0GenAsmWriter.inc which indicate in 
-//   Cpu0.td.
-  OS << '$' << StringRef(getRegisterName(RegNo)).lower();
+void Cpu0InstPrinter::printRegName(raw_ostream &OS, MCRegister Reg) {
+  markup(OS, Markup::Register)
+    << '$' << StringRef(getRegisterName(Reg)).lower();
 }
 
 //@1 {
@@ -56,7 +56,7 @@ void Cpu0InstPrinter::printOperand(const MCInst *MI, unsigned OpNo,
   }
 
   assert(Op.isExpr() && "unknown operand kind in printOperand");
-  Op.getExpr()->print(O, &MAI, true);
+  MAI.printExpr(O, *Op.getExpr());
 }
 
 void Cpu0InstPrinter::printUnsignedImm(const MCInst *MI, int opNum,

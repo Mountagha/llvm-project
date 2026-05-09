@@ -51,7 +51,9 @@ const char *Cpu0TargetLowering::getTargetNodeName(unsigned Opcode) const {
 
 Cpu0TargetLowering::Cpu0TargetLowering(const Cpu0TargetMachine &TM,
                                     const Cpu0Subtarget &STI)
-    : TargetLowering(TM, STI), SubTarget(STI), ABI(TM.getABI()) {}
+    : TargetLowering(TM, STI), SubTarget(STI), ABI(TM.getABI()) {
+  setMinFunctionAlignment(Align(2));
+}
 
 const Cpu0TargetLowering *Cpu0TargetLowering::create(const Cpu0TargetMachine &TM,
                                                      const Cpu0Subtarget &STI) {
