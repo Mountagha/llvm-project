@@ -212,7 +212,7 @@ void Cpu0AsmPrinter::emitFunctionBodyStart() {
     OutStreamer->emitRawText(OS.str());
     OutStreamer->emitRawText(StringRef("\t.set\tnoreorder"));
     OutStreamer->emitRawText(StringRef("\t.set\tnomacro"));
-    if (Cpu0FI->getEmitNOAT())
+    if (Cpu0FI && Cpu0FI->getEmitNOAT())
       OutStreamer->emitRawText(StringRef("\t.set\tnoat"));
   }
 }
@@ -227,7 +227,7 @@ void Cpu0AsmPrinter::emitFunctionBodyEnd() {
   // always be at the function end, and we can't emit and
   // break with BB logic.
   if (OutStreamer->hasRawTextSupport()) {
-    if (Cpu0FI->getEmitNOAT())
+    if (Cpu0FI && Cpu0FI->getEmitNOAT())
       OutStreamer->emitRawText(StringRef("\t.set\tat"));
     OutStreamer->emitRawText(StringRef("\t.set\tmacro"));
     OutStreamer->emitRawText(StringRef("\t.set\treorder"));

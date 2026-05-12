@@ -21,6 +21,12 @@ public:
   explicit Cpu0SEInstrInfo(const Cpu0Subtarget &STI);
 
   const Cpu0SERegisterInfo &getRegisterInfo() const override { return RI; }
+
+  bool expandPostRAPseudo(MachineInstr &MI) const override;
+
+private:
+  void expandRetLR(MachineBasicBlock &MBB, MachineBasicBlock::iterator I) const;
+
 };
 
 } // end namespace llvm

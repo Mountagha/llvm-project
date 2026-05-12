@@ -100,6 +100,57 @@ namespace llvm {
         // Lower Operand specifics
         SDValue LowerGlobalAddress(SDValue Op, SelectionDAG &DAG) const;
 
+                /// Cpu0CC - This class provides methods used to analyze formal and call
+                /// arguments and inquire about calling convention information.
+                class Cpu0CC {
+                public:
+                    enum SpecialCallingConvType {
+                        NoSpecialCallingConv
+                    };
+
+                    Cpu0CC(CallingConv::ID CallConv, bool IsO32, CCState &Info,
+                                 SpecialCallingConvType SpecialCallingConv =
+                                         NoSpecialCallingConv);
+
+                    void analyzeCallResult(const SmallVectorImpl<ISD::InputArg> &Ins,
+                                                                 bool IsSoftFloat, const SDNode *CallNode,
+                                                                 const Type *RetTy) const;
+
+                    void analyzeReturn(const SmallVectorImpl<ISD::OutputArg> &Outs,
+                                                         bool IsSoftFloat, const Type *RetTy) const;
+
+                    const CCState &getCCInfo() const { return CCInfo; }
+
+                    /// hasByValArg - Returns true if function has byval arguments.
+                    bool hasByValArg() const { return !ByValArgs.empty(); }
+
+                    /// reservedArgArea - The size of the area the caller reserves for
+                    /// register arguments. This is 16-byte if ABI is O32.
+                    unsigned reservedArgArea() const;
+
+                    using byval_iterator = SmallVectorImpl<ByValArgInfo>::const_iterator;
+                    byval_iterator byval_begin() const { return ByValArgs.begin(); }
+                    byval_iterator byval_end() const { return ByValArgs.end(); }
+
+                private:
+
+                    /// Return the type of the register which is used to pass an argument
+                    /// or return a value. This function returns f64 if the argument is an
+                    /// i64 value which has been generated as a result of softening an
+                    /// f128 value. Otherwise, it just returns VT.
+                    MVT getRegVT(MVT VT, bool IsSoftFloat) const;
+
+                    template<typename Ty>
+                    void analyzeReturn(const SmallVectorImpl<Ty> &RetVals,
+                                                         bool IsSoftFloat, const SDNode *CallNode,
+                                                         const Type *RetTy) const;
+
+                    CCState &CCInfo;
+                    CallingConv::ID CallConv;
+                    bool IsO32;
+                    SmallVector<ByValArgInfo, 2> ByValArgs;
+                };
+
         // - must exist even without function call.
         SDValue LowerFormalArguments(SDValue Chain,
                                     CallingConv::ID CallConv, bool isVarArg,
@@ -112,8 +163,8 @@ namespace llvm {
                             const SmallVectorImpl<ISD::OutputArg> &Outs,
                             const SmallVectorImpl<SDValue> &OutVals,
                             const SDLoc &dl, SelectionDAG &DAG) const override;
-
     };
+
     const Cpu0TargetLowering *
     createCpu0SETargetLowering(const Cpu0TargetMachine &TM, const Cpu0Subtarget &STI);
 } // end namespace llvm

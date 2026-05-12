@@ -12,6 +12,12 @@
 //===----------------------------------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
+// Instruction format superclass
+//===----------------------------------------------------------------------===//
+
+include "Cpu0InstrFormats.td"
+
+//===----------------------------------------------------------------------===//
 // Cpu0 profiles and nodes
 //===----------------------------------------------------------------------===//
 
@@ -21,11 +27,9 @@ def SDT_Cpu0Ret          : SDTypeProfile<0, 1, [SDTCisInt<0>]>;
 def Cpu0Ret : SDNode<"Cpu0ISD::Ret", SDTNone,
                      [SDNPHasChain, SDNPOptInGlue, SDNPVariadic]>;
 
-//===----------------------------------------------------------------------===//
-// Instruction format superclass
-//===----------------------------------------------------------------------===//
-
-include "Cpu0InstrFormats.td"
+let isReturn = 1, isTerminator = 1, hasDelaySlot = 1,
+  isBarrier = 1, hasCtrlDep = 1 in
+  def RetLR : Cpu0Pseudo<(outs), (ins), "", [(Cpu0Ret)]>;
 
 //===----------------------------------------------------------------------===//
 // Cpu0 Operand, Complex Patterns and Transformations Definitions.
@@ -60,13 +64,13 @@ def addr :
 class AlignedLoad<PatFrag Node> :
   PatFrag<(ops node:$ptr), (Node node:$ptr), [{
   LoadSDNode *LD = cast<LoadSDNode>(N);
-  return LD->getMemoryVT().getSizeInBits()/8 <= LD->getAlignment();
+  return LD->getMemoryVT().getSizeInBits()/8 <= LD->getAlign().value();
 }]>;
 
 class AlignedStore<PatFrag Node> :
   PatFrag<(ops node:$val, node:$ptr), (Node node:$val, node:$ptr), [{
   StoreSDNode *SD = cast<StoreSDNode>(N);
-  return SD->getMemoryVT().getSizeInBits()/8 <= SD->getAlignment();
+  return SD->getMemoryVT().getSizeInBits()/8 <= SD->getAlign().value();
 }]>;
 
 // Load/Store PatFrags.

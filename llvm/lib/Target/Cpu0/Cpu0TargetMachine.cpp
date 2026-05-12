@@ -5,6 +5,7 @@
 #include "Cpu0TargetObjectFile.h"
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Target/TargetOptions.h"
+#include "Cpu0SEISelDAGToDAG.h"
 
 using namespace llvm;
 
@@ -75,6 +76,25 @@ Cpu0ebTargetMachine::Cpu0ebTargetMachine(
 
 void Cpu0elTargetMachine::anchor() {}
 
+class Cpu0PassConfig : public TargetPassConfig {
+public:
+  Cpu0PassConfig(Cpu0TargetMachine &TM, legacy::PassManagerBase &PM)
+      : TargetPassConfig(TM, PM) {}
+
+  bool addInstSelector() override;
+
+  Cpu0TargetMachine &getCpu0TargetMachine() const {
+    return getTM<Cpu0TargetMachine>();
+  }
+};
+
+// Install and instrcution selector pass using 
+// the ISelDag to gen Cpu0 code.
+bool Cpu0PassConfig::addInstSelector() {
+  addPass(createCpu0SEISelDag(getCpu0TargetMachine(), getOptLevel()));
+  return false;
+}
+
 Cpu0elTargetMachine::Cpu0elTargetMachine(
     const Target &T, const Triple &TT, StringRef CPU, StringRef FS,
     const TargetOptions &Options, std::optional<Reloc::Model> RM,
@@ -107,7 +127,7 @@ Cpu0TargetMachine::getSubtargetImpl(const Function &F) const {
 
 TargetPassConfig *
 Cpu0TargetMachine::createPassConfig(legacy::PassManagerBase &PM) {
-  return new TargetPassConfig(*this, PM);
+  return new Cpu0PassConfig(*this, PM);
 }
 
 extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeCpu0Target() {
