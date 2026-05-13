@@ -121,6 +121,21 @@ Cpu0SEFrameLowering::hasReservedCallFrame(const MachineFunction &MF) const {
     !MFI.hasVarSizedObjects();
 }
 
+// This method is called immediately before PrologEpilogInserter scans the 
+//  physical registers used to determine what callee saved registers should be 
+//  spilled. This method is optional. 
+void Cpu0SEFrameLowering::determineCalleeSaves(MachineFunction &MF,
+                                               BitVector &SavedRegs,
+                                               RegScavenger *RS) const {
+  TargetFrameLowering::determineCalleeSaves(MF, SavedRegs, RS);
+  Cpu0FunctionInfo *Cpu0FI = MF.getInfo<Cpu0FunctionInfo>();
+
+  if (MF.getFrameInfo().hasCalls())
+    setAliasRegs(MF, SavedRegs, Cpu0::LR);
+
+  return;
+}
+
 const Cpu0FrameLowering *
 llvm::createCpu0SEFrameLowering(const Cpu0Subtarget &ST) {
   return new Cpu0SEFrameLowering(ST);
