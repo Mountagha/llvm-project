@@ -33,8 +33,12 @@ bool Cpu0SEInstrInfo::expandPostRAPseudo(MachineInstr &MI) const {
 
 void Cpu0SEInstrInfo::copyPhysReg(MachineBasicBlock &MBB,
                                   MachineBasicBlock::iterator I,
-                                  const DebugLoc &DL, MCRegister DestReg,
-                                  MCRegister SrcReg, bool KillSrc) const {
+                                  const DebugLoc &DL, Register DestReg,
+                                  Register SrcReg, bool KillSrc,
+                                  bool RenamableDest,
+                                  bool RenamableSrc) const {
+  (void)RenamableDest;
+  (void)RenamableSrc;
   unsigned Opc = 0, ZeroReg = 0;
 
   if (Cpu0::CPURegsRegClass.contains(DestReg)) { // Copy to CPU Reg.

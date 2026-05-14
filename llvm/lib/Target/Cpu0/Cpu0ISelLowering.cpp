@@ -59,7 +59,7 @@ Cpu0TargetLowering::Cpu0TargetLowering(const Cpu0TargetMachine &TM,
   setOperationAction(ISD::UDIV, MVT::i32, Expand);
   setOperationAction(ISD::UREM, MVT::i32, Expand);
 
-  setTargetDAGCombine(ISD::SDIVREM)
+  setTargetDAGCombine(ISD::SDIVREM);
   setTargetDAGCombine(ISD::UDIVREM);
 }
 
@@ -114,7 +114,7 @@ SDValue Cpu0TargetLowering::PerformDAGCombine(SDNode *N, DAGCombinerInfo &DCI)
   default: break;
   case ISD::SDIVREM:
   case ISD::UDIVREM:
-    return performDivRemCombine(N, DAG, DCI, Subtarget);
+    return performDivRemCombine(N, DAG, DCI, SubTarget);
   }
 
   return SDValue();
