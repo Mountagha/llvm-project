@@ -38,35 +38,41 @@ public:
                            MachineBasicBlock::iterator MBBI,
                            Register SrcReg, bool isKill, int FrameIndex,
                            const TargetRegisterClass *RC,
-                           const TargetRegisterInfo *TRI) const override {
-      storeRegToStack(MBB, MBBI, SrcReg, isKill, FrameIndex, RC, TRI, 0);
+                                                     Register VReg,
+                                                     MachineInstr::MIFlag Flags =
+                                                             MachineInstr::NoFlags) const override {
+            storeRegToStack(MBB, MBBI, SrcReg, isKill, FrameIndex, RC, 0, Flags);
     }
 
     void loadRegFromStackSlot(MachineBasicBlock &MBB,
                               MachineBasicBlock::iterator MBBI,
                               Register DestReg, int FrameIndex,
                               const TargetRegisterClass *RC,
-                              const TargetRegisterInfo *TRI) const override {
-      loadRegFromStack(MBB, MBBI, DestReg, FrameIndex, RC, TRI, 0);
+                                                            Register VReg, unsigned SubReg = 0,
+                                                            MachineInstr::MIFlag Flags =
+                                                                    MachineInstr::NoFlags) const override {
+            loadRegFromStack(MBB, MBBI, DestReg, FrameIndex, RC, 0, Flags);
     }
 
     virtual void storeRegToStack(MachineBasicBlock &MBB,
                                 MachineBasicBlock::iterator MI,
                                 Register SrcReg, bool isKill, int FrameIndex,
                                 const TargetRegisterClass *RC,
-                                const TargetRegisterInfo *TRI,
-                                int64_t Offset) const = 0;
+                                                                int64_t Offset,
+                                                                MachineInstr::MIFlag Flags =
+                                                                        MachineInstr::NoFlags) const = 0;
 
     virtual void loadRegFromStack(MachineBasicBlock &MBB,
                                   MachineBasicBlock::iterator MI,
                                   Register DestReg, int FrameIndex,
                                   const TargetRegisterClass *RC,
-                                  const TargetRegisterInfo *TRI,
-                                  int64_t Offset) const = 0;
-    };
+                                                                    int64_t Offset,
+                                                                    MachineInstr::MIFlag Flags =
+                                                                            MachineInstr::NoFlags) const = 0;
 
-    MachineMemOperand *GetMemOperand(MachineBasicBlock &MBB, int FI,
-                                  MachineMemOperand::Flags Flags) const;
+        MachineMemOperand *GetMemOperand(MachineBasicBlock &MBB, int FI,
+                                                                    MachineMemOperand::Flags Flags) const;
+        };
 
 const Cpu0InstrInfo *createCpu0SEInstrInfo(const Cpu0Subtarget &STI);
 

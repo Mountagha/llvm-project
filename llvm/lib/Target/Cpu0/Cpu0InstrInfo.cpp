@@ -1,6 +1,7 @@
 #include "Cpu0InstrInfo.h"
 
 #include "Cpu0Subtarget.h"
+#include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/MachineInstr.h"
 #include "llvm/CodeGen/TargetOpcodes.h"
 

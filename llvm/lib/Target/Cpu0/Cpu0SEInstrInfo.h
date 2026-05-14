@@ -11,6 +11,7 @@
 
 #include "Cpu0InstrInfo.h"
 #include "Cpu0SERegisterInfo.h"
+#include "Cpu0AnalyzeImmediate.h"
 
 namespace llvm {
 
@@ -25,8 +26,8 @@ public:
   bool expandPostRAPseudo(MachineInstr &MI) const override;
 
   /// Adjust SP by Amount bytes.
-  virtual void adjustStackPtr(unsigned SP, int64_t Amount, MachineBasicBlock &MBB,
-                            MachineBasicBlock::iterator I) const override;
+  void adjustStackPtr(unsigned SP, int64_t Amount, MachineBasicBlock &MBB,
+                      MachineBasicBlock::iterator I) const;
 
   /// Emit a series of instructions to load an immediate. If NewImm is a
   /// non-NULL parameter, the last instruction is not emitted, but instead
@@ -39,15 +40,17 @@ public:
                       MachineBasicBlock::iterator MI,
                       Register SrcReg, bool isKill, int FrameIndex,
                       const TargetRegisterClass *RC,
-                      const TargetRegisterInfo *TRI,
-                      int64_t Offset) const override;
+              int64_t Offset,
+              MachineInstr::MIFlag Flags =
+                MachineInstr::NoFlags) const override;
 
   void loadRegFromStack(MachineBasicBlock &MBB,
                       MachineBasicBlock::iterator MI,
                       Register DestReg, int FrameIndex,
                       const TargetRegisterClass *RC,
-                      const TargetRegisterInfo *TRI,
-                      int64_t Offset) const override;
+              int64_t Offset,
+              MachineInstr::MIFlag Flags =
+                MachineInstr::NoFlags) const override;
 private:
   void expandRetLR(MachineBasicBlock &MBB, MachineBasicBlock::iterator I) const;
 

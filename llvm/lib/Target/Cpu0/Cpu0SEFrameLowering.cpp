@@ -18,6 +18,14 @@
 
 using namespace llvm;
 
+/// Mark Reg and all registers aliasing it in the bitset.
+static void setAliasRegs(MachineFunction &MF, BitVector &SavedRegs,
+                         unsigned Reg) {
+  const TargetRegisterInfo *TRI = MF.getSubtarget().getRegisterInfo();
+  for (MCRegAliasIterator AI(Reg, TRI, true); AI.isValid(); ++AI)
+    SavedRegs.set(*AI);
+}
+
 Cpu0SEFrameLowering::Cpu0SEFrameLowering(const Cpu0Subtarget &STI)
     : Cpu0FrameLowering(STI, STI.stackAlignment()) {}
 
@@ -45,8 +53,7 @@ void Cpu0SEFrameLowering::emitPrologue(MachineFunction &MF,
   // No need to allocate space on the stack.
   if (StackSize == 0 && !MFI.adjustsStack()) return;
 
-  MachineModuleInfo &MMI = MF.getMMI();
-  const MCRegisterInfo *MRI = MMI.getContext().getRegisterInfo();
+  const TargetRegisterInfo *TRI = MF.getSubtarget().getRegisterInfo();
 
   // Adjust stack.
   TII.adjustStackPtr(SP, -StackSize, MBB, MBBI);
@@ -75,7 +82,7 @@ void Cpu0SEFrameLowering::emitPrologue(MachineFunction &MF,
       {
         // Reg is in CPURegs.
         unsigned CFIIndex = MF.addFrameInst(MCCFIInstruction::createOffset(
-            nullptr, MRI->getDwarfRegNum(Reg, true), Offset));
+          nullptr, TRI->getDwarfRegNum(Reg, true), Offset));
         BuildMI(MBB, MBBI, dl, TII.get(TargetOpcode::CFI_INSTRUCTION))
             .addCFIIndex(CFIIndex);
       }

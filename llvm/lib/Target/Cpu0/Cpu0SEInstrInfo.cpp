@@ -39,7 +39,7 @@ void Cpu0SEInstrInfo::expandRetLR(MachineBasicBlock &MBB, MachineBasicBlock::ite
 void Cpu0SEInstrInfo::adjustStackPtr(unsigned SP, int64_t Amount,
                                     MachineBasicBlock &MBB,
                                     MachineBasicBlock::iterator I) const {
-  DebugLoc DL = I =! MBB.end() ? I->getDebugLoc() : DebugLoc();
+  DebugLoc DL = I != MBB.end() ? I->getDebugLoc() : DebugLoc();
   unsigned ADDu = Cpu0::ADDu;
   unsigned ADDiu = Cpu0::ADDiu;
 
@@ -48,7 +48,9 @@ void Cpu0SEInstrInfo::adjustStackPtr(unsigned SP, int64_t Amount,
     BuildMI(MBB, I, DL, get(ADDiu), SP).addReg(SP).addImm(Amount);
   } else { // Expand immediate that does not fit in 16-bit.
     unsigned Reg = loadImmediate(Amount, MBB, I, DL, nullptr);
-    BuildMI(MBB, I, DL, get(ADDu), SP).addReg(SP).addReg(Reg, RegState::Kill)
+    BuildMI(MBB, I, DL, get(ADDu), SP)
+        .addReg(SP)
+        .addReg(Reg, RegState::Kill);
   }
 }
 
@@ -95,8 +97,9 @@ Cpu0SEInstrInfo::loadImmediate(int64_t Imm, MachineBasicBlock &MBB,
 void Cpu0SEInstrInfo::
 storeRegToStack(MachineBasicBlock &MBB, MachineBasicBlock::iterator I,
                 Register SrcReg, bool isKill, int FI,
-                const TargetRegisterClass *RC, const TargetRegisterInfo *TRI,
-                int64_t Offset) const {
+                const TargetRegisterClass *RC, int64_t Offset,
+                MachineInstr::MIFlag Flags) const {
+  (void)RC;
   DebugLoc DL;
   MachineMemOperand *MMO = GetMemOperand(MBB, FI, MachineMemOperand::MOStore);
 
@@ -104,14 +107,19 @@ storeRegToStack(MachineBasicBlock &MBB, MachineBasicBlock::iterator I,
 
   Opc = Cpu0::ST;
   assert(Opc && "Register class not handled!");
-  BuildMI(MBB, I, DL, get(Opc)).addReg(SrcReg, getKillRegState(isKill))
-    .addFrameIndex(FI).addImm(Offset).addMemOperand(MMO);
+  BuildMI(MBB, I, DL, get(Opc))
+      .setMIFlag(Flags)
+      .addReg(SrcReg, getKillRegState(isKill))
+      .addFrameIndex(FI)
+      .addImm(Offset)
+      .addMemOperand(MMO);
 }
 
 void Cpu0SEInstrInfo::
 loadRegFromStack(MachineBasicBlock &MBB, MachineBasicBlock::iterator I,
                  Register DestReg, int FI, const TargetRegisterClass *RC,
-                 const TargetRegisterInfo *TRI, int64_t Offset) const {
+                 int64_t Offset, MachineInstr::MIFlag Flags) const {
+  (void)RC;
   DebugLoc DL;
   if (I != MBB.end()) DL = I->getDebugLoc();
   MachineMemOperand *MMO = GetMemOperand(MBB, FI, MachineMemOperand::MOLoad);
@@ -119,7 +127,10 @@ loadRegFromStack(MachineBasicBlock &MBB, MachineBasicBlock::iterator I,
 
   Opc = Cpu0::LD;
   assert(Opc && "Register class not handled!");
-  BuildMI(MBB, I, DL, get(Opc), DestReg).addFrameIndex(FI).addImm(Offset)
-    .addMemOperand(MMO);
+  BuildMI(MBB, I, DL, get(Opc), DestReg)
+      .setMIFlag(Flags)
+      .addFrameIndex(FI)
+      .addImm(Offset)
+      .addMemOperand(MMO);
 }
 
