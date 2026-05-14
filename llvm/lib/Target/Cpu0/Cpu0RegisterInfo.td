@@ -47,7 +47,14 @@ let Namespace = "Cpu0" in {
 
   def PC   : Cpu0C0Reg<0, "pc">,  DwarfRegNum<[20]>;
   def EPC  : Cpu0C0Reg<1, "epc">, DwarfRegNum<[21]>;
+
+  // Hi/Lo registers number and Name
+  def HI  : Cpu0Reg<0, "ac0">, DwarfRegNum<[18]>;
+  def LO  : Cpu0Reg<0, "ac0">, DwarfRegNum<[19]>;
 }
+
+// Hi/Lo Registers Class
+def HILO : RegisterClass<"Cpu0", [i32], 32, (add HI, LO)>;
 
 //===----------------------------------------------------------------------===//
 //@Register Classes
