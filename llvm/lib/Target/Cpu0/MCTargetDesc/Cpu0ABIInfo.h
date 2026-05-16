@@ -8,6 +8,8 @@
 #include "llvm/IR/CallingConv.h"
 #include "llvm/MC/MCRegisterInfo.h"
 
+#include "Cpu0FixUpKinds.h"
+
 namespace llvm {
 
 class MCTargetOptions;
