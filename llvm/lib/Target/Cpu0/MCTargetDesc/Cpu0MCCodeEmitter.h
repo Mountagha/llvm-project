@@ -43,9 +43,8 @@ public:
 
   ~Cpu0MCCodeEmitter() override {}
 
-  void EmitByte(unsigned char C, raw_ostream &OS) const;
-
-  void EmitInstruction(uint64_t Val, unsigned Size, raw_ostream &OS) const;
+  void EmitInstruction(uint64_t Val, unsigned Size,
+                       SmallVectorImpl<char> &CB) const;
 
   void encodeInstruction(const MCInst &MI, SmallVectorImpl<char> &CB,
                         SmallVectorImpl<MCFixup> &Fixups,

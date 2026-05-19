@@ -8,7 +8,7 @@
 #include "llvm/IR/CallingConv.h"
 #include "llvm/MC/MCRegisterInfo.h"
 
-#include "Cpu0FixUpKinds.h"
+#include "Cpu0FixupKinds.h"
 
 namespace llvm {
 

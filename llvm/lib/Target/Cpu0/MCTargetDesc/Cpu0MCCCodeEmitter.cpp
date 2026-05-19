@@ -37,33 +37,28 @@
 using namespace llvm;
 
 MCCodeEmitter *llvm::createCpu0MCCodeEmitterEB(const MCInstrInfo &MCII,
-                                               const MCRegisterInfo &MRI,
                                                MCContext &Ctx) {
   return new Cpu0MCCodeEmitter(MCII, Ctx, false);
 }
 
 MCCodeEmitter *llvm::createCpu0MCCodeEmitterEL(const MCInstrInfo &MCII,
-                                               const MCRegisterInfo &MRI,
                                                MCContext &Ctx) {
   return new Cpu0MCCodeEmitter(MCII, Ctx, true);
 }
 
-void Cpu0MCCodeEmitter::EmitByte(unsigned char C, raw_ostream &OS) const {
-  OS << (char)C;
-}
-
-void Cpu0MCCodeEmitter::EmitInstruction(uint64_t Val, unsigned Size, raw_ostream &OS) const {
+void Cpu0MCCodeEmitter::EmitInstruction(uint64_t Val, unsigned Size,
+                                        SmallVectorImpl<char> &CB) const {
   // Output the instruction encoding in little endian byte order.
   for (unsigned i = 0; i < Size; ++i) {
     unsigned Shift = IsLittleEndian ? i * 8 : (Size - 1 - i) * 8;
-    EmitByte((Val >> Shift) & 0xff, OS);
+    CB.push_back((Val >> Shift) & 0xff);
   }
 }
 
 /// encodeInstruction - Emit the instruction.
 /// Size the instruction (currently only 4 bytes)
 void Cpu0MCCodeEmitter::
-encodeInstruction(const MCInst &MI, raw_ostream &OS,
+encodeInstruction(const MCInst &MI, SmallVectorImpl<char> &CB,
                   SmallVectorImpl<MCFixup> &Fixups,
                   const MCSubtargetInfo &STI) const
 {
@@ -87,7 +82,7 @@ encodeInstruction(const MCInst &MI, raw_ostream &OS,
   // For now all instructions are 4 bytes
   int Size = 4; // FIXME: Have Desc.getSize() return the correct value!
 
-  EmitInstruction(Binary, Size, OS);
+  EmitInstruction(Binary, Size, CB);
 }
 
 //@getExprOpValue {
@@ -133,8 +128,8 @@ getMachineOpValue(const MCInst &MI, const MCOperand &MO,
     return RegNo;
   } else if (MO.isImm()) {
     return static_cast<unsigned>(MO.getImm());
-  } else if (MO.isFPImm()) {
-    return static_cast<unsigned>(APFloat(MO.getFPImm())
+  } else if (MO.isSFPImm()) {
+    return static_cast<unsigned>(APFloat(MO.getSFPImm())
         .bitcastToAPInt().getHiBits(32).getLimitedValue());
   }
   // MO must be an Expr.

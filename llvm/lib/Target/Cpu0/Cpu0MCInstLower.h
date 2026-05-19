@@ -5,6 +5,7 @@
 #ifndef LLVM_LIB_TARGET_CPU0_CPU0MCINSTLOWER_H
 #define LLVM_LIB_TARGET_CPU0_CPU0MCINSTLOWER_H
 
+#include "MCTargetDesc/Cpu0MCExpr.h"
 
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/CodeGen/MachineOperand.h"

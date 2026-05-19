@@ -20,7 +20,6 @@
 #include "llvm/MC/MCAssembler.h"
 #include "llvm/MC/MCDirectives.h"
 #include "llvm/MC/MCELFObjectWriter.h"
-#include "llvm/MC/MCFixupKindInfo.h"
 #include "llvm/MC/MCObjectWriter.h"
 #include "llvm/MC/MCSubtargetInfo.h"
 #include "llvm/Support/CommandLine.h"
@@ -46,7 +45,6 @@ static unsigned adjustFixupValue(const MCFixup &Fixup, uint64_t Value,
   switch (Kind) {
   default:
     return 0;
-  case FK_GPRel_4:
   case FK_Data_4:
   case Cpu0::fixup_Cpu0_LO16:
     break;
@@ -114,15 +112,8 @@ void Cpu0AsmBackend::applyFixup(const MCAssembler &Asm, const MCFixup &Fixup,
 }
 
 //@getFixupKindInfo {
-const MCFixupKindInfo &Cpu0AsmBackend::
+MCFixupKindInfo Cpu0AsmBackend::
 getFixupKindInfo(MCFixupKind Kind) const {
-  unsigned JSUBReloRec = 0;
-  if (HasLLD) {
-    JSUBReloRec = MCFixupKindInfo::FKF_IsPCRel;
-  }
-  else {
-    JSUBReloRec = MCFixupKindInfo::FKF_IsPCRel | MCFixupKindInfo::FKF_Constant;
-  }
   const static MCFixupKindInfo Infos[Cpu0::NumTargetFixupKinds] = {
     // This table *must* be in same the order of fixup_* kinds in
     // Cpu0FixupKinds.h.

@@ -7,8 +7,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "Cpu0Config.h"
-
 #include "MCTargetDesc/Cpu0BaseInfo.h"
 #include "MCTargetDesc/Cpu0FixupKinds.h"
 #include "MCTargetDesc/Cpu0MCTargetDesc.h"
@@ -22,6 +20,21 @@
 
 using namespace llvm;
 
+// Cpu0 ELF Relocation Types (custom values for this architecture)
+namespace {
+  // Machine type for Cpu0
+  const unsigned EM_CPU0 = 0xFD;
+  
+  // Cpu0 ELF Relocation Types
+  const unsigned R_CPU0_NONE      = 0;
+  const unsigned R_CPU0_32        = 1;
+  const unsigned R_CPU0_GPREL16   = 3;
+  const unsigned R_CPU0_GOT16     = 5;
+  const unsigned R_CPU0_HI16      = 7;
+  const unsigned R_CPU0_LO16      = 8;
+  const unsigned R_CPU0_GOT_HI16  = 13;
+  const unsigned R_CPU0_GOT_LO16  = 14;
+
 namespace {
   class Cpu0ELFObjectWriter : public MCELFObjectTargetWriter {
   public:
@@ -30,15 +43,15 @@ namespace {
 	~Cpu0ELFObjectWriter() = default;
 
     unsigned getRelocType(MCContext &Ctx, const MCValue &Target,
-                        const MCFixup &Fixup, bool IsPCRel) const override;
+                        const MCFixup &Fixup, bool IsPCRel) const;
     bool needsRelocateWithSymbol(const MCSymbol &Sym,
-                                 unsigned Type) const override;
+                                 unsigned Type) const;
   };
 }
 
 Cpu0ELFObjectWriter::Cpu0ELFObjectWriter(uint8_t OSABI,
                                          bool HasRelocationAddend, bool Is64)
-    : MCELFObjectTargetWriter(/*Is64Bit_=false*/ Is64, OSABI, ELF::EM_CPU0,
+    : MCELFObjectTargetWriter(/*Is64Bit_=false*/ Is64, OSABI, EM_CPU0,
           /*HasRelocationAddend_ = false*/ HasRelocationAddend) {}
 
 //@GetRelocType {
@@ -47,35 +60,35 @@ unsigned Cpu0ELFObjectWriter::getRelocType(MCContext &Ctx,
                                            const MCFixup &Fixup,
                                            bool IsPCRel) const {
   // determine the type of the relocation
-  unsigned Type = (unsigned)ELF::R_CPU0_NONE;
+  unsigned Type = (unsigned)R_CPU0_NONE;
   unsigned Kind = (unsigned)Fixup.getKind();
 
   switch (Kind) {
   default:
     llvm_unreachable("invalid fixup kind!");
   case FK_Data_4:
-    Type = ELF::R_CPU0_32;
+    Type = R_CPU0_32;
     break;
   case Cpu0::fixup_Cpu0_32:
-    Type = ELF::R_CPU0_32;
+    Type = R_CPU0_32;
     break;
   case Cpu0::fixup_Cpu0_GPREL16:
-    Type = ELF::R_CPU0_GPREL16;
+    Type = R_CPU0_GPREL16;
     break;
   case Cpu0::fixup_Cpu0_GOT:
-    Type = ELF::R_CPU0_GOT16;
+    Type = R_CPU0_GOT16;
     break;
   case Cpu0::fixup_Cpu0_HI16:
-    Type = ELF::R_CPU0_HI16;
+    Type = R_CPU0_HI16;
     break;
   case Cpu0::fixup_Cpu0_LO16:
-    Type = ELF::R_CPU0_LO16;
+    Type = R_CPU0_LO16;
     break;
   case Cpu0::fixup_Cpu0_GOT_HI16:
-    Type = ELF::R_CPU0_GOT_HI16;
+    Type = R_CPU0_GOT_HI16;
     break;
   case Cpu0::fixup_Cpu0_GOT_LO16:
-    Type = ELF::R_CPU0_GOT_LO16;
+    Type = R_CPU0_GOT_LO16;
     break;
   }
 
@@ -93,7 +106,7 @@ Cpu0ELFObjectWriter::needsRelocateWithSymbol(const MCSymbol &Sym,
   default:
     return true;
 
-  case ELF::R_CPU0_GOT16:
+  case R_CPU0_GOT16:
   // For Cpu0 pic mode, I think it's OK to return true but I didn't confirm.
   //  llvm_unreachable("Should have been handled already");
     return true;
@@ -103,14 +116,14 @@ Cpu0ELFObjectWriter::needsRelocateWithSymbol(const MCSymbol &Sym,
   // relocation at a time, we have to force them to relocate with a symbol to
   // avoid ending up with a pair where one points to a section and another
   // points to a symbol.
-  case ELF::R_CPU0_HI16:
-  case ELF::R_CPU0_LO16:
+  case R_CPU0_HI16:
+  case R_CPU0_LO16:
   // R_CPU0_32 should be a relocation record, I don't know why Mips set it to 
   // false.
-  case ELF::R_CPU0_32:
+  case R_CPU0_32:
     return true;
 
-  case ELF::R_CPU0_GPREL16:
+  case R_CPU0_GPREL16:
     return false;
   }
 }

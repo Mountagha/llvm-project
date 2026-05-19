@@ -16,8 +16,10 @@ class MCCodeEmitter;
 class MCContext;
 class MCInstrInfo;
 class MCObjectWriter;
+class MCObjectTargetWriter;
 class MCRegisterInfo;
 class MCSubtargetInfo;
+class MCTargetOptions;
 class StringRef;
 class raw_ostream;
 class Target;
@@ -25,6 +27,19 @@ class Triple;
 
 extern Target TheCpu0Target;
 extern Target TheCpu0elTarget;
+
+MCCodeEmitter *createCpu0MCCodeEmitterEB(const MCInstrInfo &MCII,
+                                         MCContext &Ctx);
+MCCodeEmitter *createCpu0MCCodeEmitterEL(const MCInstrInfo &MCII,
+                                         MCContext &Ctx);
+
+MCAsmBackend *createCpu0AsmBackend(const Target &T,
+                                   const MCSubtargetInfo &STI,
+                                   const MCRegisterInfo &MRI,
+                                   const MCTargetOptions &Options);
+
+/// Construct a Cpu0 ELF object writer.
+std::unique_ptr<MCObjectTargetWriter> createCpu0ELFObjectWriter(const Triple &TT);
 
 }   // end namespace llvm
 
