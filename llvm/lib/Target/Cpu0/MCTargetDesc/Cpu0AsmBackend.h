@@ -22,12 +22,14 @@
 namespace llvm {
 
 class MCAssembler;
+class MCFragment;
 struct MCFixupKindInfo;
 class Target;
 class MCObjectWriter;
+class MCObjectTargetWriter;
 
 class Cpu0AsmBackend : public MCAsmBackend {
-    Triple TheTriple;
+  Triple TheTriple;
 
 public:
   Cpu0AsmBackend(const Target& T, const Triple &TT)
@@ -37,12 +39,11 @@ public:
   std::unique_ptr<MCObjectTargetWriter>
   createObjectTargetWriter() const override;
 
-  void applyFixup(const MCAssembler &Asm, const MCFixup &Fixup,
-                  const MCValue &Target, MutableArrayRef<char> Data,
-                  uint64_t Value, bool IsResolved,
-                  const MCSubtargetInfo *STI) const override;
+  void applyFixup(const MCFragment &F, const MCFixup &Fixup,
+                  const MCValue &Target, uint8_t *Data, uint64_t Value,
+                  bool IsResolved) override;
 
-  MCFixupKindInfo getFixupKindInfo(MCFixupKind Kind) const;
+  MCFixupKindInfo getFixupKindInfo(MCFixupKind Kind) const override;
 
   unsigned getNumFixupKinds() const {
     return Cpu0::NumTargetFixupKinds;
@@ -57,7 +58,8 @@ public:
     return false;
   }
 
-  bool writeNopData(raw_ostream &OS, uint64_t Count) const;
+  bool writeNopData(raw_ostream &OS, uint64_t Count,
+                    const MCSubtargetInfo *STI) const override;
 };  // class Cpu0AsmBackend
 
 } // namespace.

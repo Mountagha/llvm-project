@@ -104,7 +104,7 @@ void Cpu0MCExpr::printImpl(raw_ostream &OS, const MCAsmInfo *MAI) const {
   if (Expr->evaluateAsAbsolute(AbsVal))
     OS << AbsVal;
   else
-    OS << *Expr;
+    MAI->printExpr(OS, *Expr);
   OS << ')';
 }
 

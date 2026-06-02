@@ -22,32 +22,30 @@ using namespace llvm;
 
 // Cpu0 ELF Relocation Types (custom values for this architecture)
 namespace {
-  // Machine type for Cpu0
-  const unsigned EM_CPU0 = 0xFD;
-  
-  // Cpu0 ELF Relocation Types
-  const unsigned R_CPU0_NONE      = 0;
-  const unsigned R_CPU0_32        = 1;
-  const unsigned R_CPU0_GPREL16   = 3;
-  const unsigned R_CPU0_GOT16     = 5;
-  const unsigned R_CPU0_HI16      = 7;
-  const unsigned R_CPU0_LO16      = 8;
-  const unsigned R_CPU0_GOT_HI16  = 13;
-  const unsigned R_CPU0_GOT_LO16  = 14;
+// Machine type for Cpu0.
+const unsigned EM_CPU0 = 0xFD;
 
-namespace {
-  class Cpu0ELFObjectWriter : public MCELFObjectTargetWriter {
-  public:
-    Cpu0ELFObjectWriter(uint8_t OSABI, bool HasRelocationAddend, bool Is64);
+// Cpu0 ELF relocation types.
+const unsigned R_CPU0_NONE = 0;
+const unsigned R_CPU0_32 = 1;
+const unsigned R_CPU0_GPREL16 = 3;
+const unsigned R_CPU0_GOT16 = 5;
+const unsigned R_CPU0_HI16 = 7;
+const unsigned R_CPU0_LO16 = 8;
+const unsigned R_CPU0_GOT_HI16 = 13;
+const unsigned R_CPU0_GOT_LO16 = 14;
 
-	~Cpu0ELFObjectWriter() = default;
+class Cpu0ELFObjectWriter : public MCELFObjectTargetWriter {
+public:
+  Cpu0ELFObjectWriter(uint8_t OSABI, bool HasRelocationAddend, bool Is64);
+  ~Cpu0ELFObjectWriter() override = default;
 
-    unsigned getRelocType(MCContext &Ctx, const MCValue &Target,
-                        const MCFixup &Fixup, bool IsPCRel) const;
-    bool needsRelocateWithSymbol(const MCSymbol &Sym,
-                                 unsigned Type) const;
-  };
-}
+  unsigned getRelocType(const MCFixup &Fixup, const MCValue &Target,
+                        bool IsPCRel) const override;
+  bool needsRelocateWithSymbol(const MCValue &Sym,
+                               unsigned Type) const override;
+};
+} // namespace
 
 Cpu0ELFObjectWriter::Cpu0ELFObjectWriter(uint8_t OSABI,
                                          bool HasRelocationAddend, bool Is64)
@@ -55,9 +53,8 @@ Cpu0ELFObjectWriter::Cpu0ELFObjectWriter(uint8_t OSABI,
           /*HasRelocationAddend_ = false*/ HasRelocationAddend) {}
 
 //@GetRelocType {
-unsigned Cpu0ELFObjectWriter::getRelocType(MCContext &Ctx,
+unsigned Cpu0ELFObjectWriter::getRelocType(const MCFixup &Fixup,
                                            const MCValue &Target,
-                                           const MCFixup &Fixup,
                                            bool IsPCRel) const {
   // determine the type of the relocation
   unsigned Type = (unsigned)R_CPU0_NONE;
@@ -96,9 +93,8 @@ unsigned Cpu0ELFObjectWriter::getRelocType(MCContext &Ctx,
 }
 //@GetRelocType }
 
-bool
-Cpu0ELFObjectWriter::needsRelocateWithSymbol(const MCSymbol &Sym,
-                                             unsigned Type) const {
+bool Cpu0ELFObjectWriter::needsRelocateWithSymbol(const MCValue &Sym,
+                                                  unsigned Type) const {
   // FIXME: This is extremelly conservative. This really needs to use a
   // whitelist with a clear explanation for why each realocation needs to
   // point to the symbol, not to the section.

@@ -36,8 +36,7 @@ static cl::opt<bool> HasLLD(
 
 //@adjustFixupValue {
 // Prepare value for the target space for it
-static unsigned adjustFixupValue(const MCFixup &Fixup, uint64_t Value,
-                                 MCContext &Ctx) {
+static unsigned adjustFixupValue(const MCFixup &Fixup, uint64_t Value) {
 
   unsigned Kind = Fixup.getKind();
 
@@ -67,20 +66,17 @@ Cpu0AsmBackend::createObjectTargetWriter() const {
 /// ApplyFixup - Apply the \p Value for given \p Fixup into the provided
 /// data fragment, at the offset specified by the fixup and following the
 /// fixup kind as appropriate.
-void Cpu0AsmBackend::applyFixup(const MCAssembler &Asm, const MCFixup &Fixup,
-                                const MCValue &Target,
-                                MutableArrayRef<char> Data, uint64_t Value,
-                                bool IsResolved,
-                                const MCSubtargetInfo *STI) const {
+void Cpu0AsmBackend::applyFixup(const MCFragment &F, const MCFixup &Fixup,
+                                const MCValue &Target, uint8_t *Data,
+                                uint64_t Value, bool IsResolved) {
   MCFixupKind Kind = Fixup.getKind();
-  MCContext &Ctx = Asm.getContext();
-  Value = adjustFixupValue(Fixup, Value, Ctx);
+  Value = adjustFixupValue(Fixup, Value);
 
   if (!Value)
     return; // Doesn't change encoding.
 
   // Where do we start in the object
-  unsigned Offset = Fixup.getOffset();
+  unsigned Offset = 0;
   // Number of bytes we need to fixup
   unsigned NumBytes = (getFixupKindInfo(Kind).TargetSize + 7) / 8;
   // Used to point to big endian bytes
@@ -97,7 +93,7 @@ void Cpu0AsmBackend::applyFixup(const MCAssembler &Asm, const MCFixup &Fixup,
 
   for (unsigned i = 0; i != NumBytes; ++i) {
     unsigned Idx = TheTriple.isLittleEndian() ? i : (FullSize - 1 - i);
-    CurVal |= (uint64_t)((uint8_t)Data[Offset + Idx]) << (i*8);
+    CurVal |= (uint64_t)Data[Offset + Idx] << (i * 8);
   }
 
   uint64_t Mask = ((uint64_t)(-1) >>
@@ -107,7 +103,7 @@ void Cpu0AsmBackend::applyFixup(const MCAssembler &Asm, const MCFixup &Fixup,
   // Write out the fixed up bytes back to the code/data bits.
   for (unsigned i = 0; i != NumBytes; ++i) {
     unsigned Idx = TheTriple.isLittleEndian() ? i : (FullSize - 1 - i);
-    Data[Offset + Idx] = (uint8_t)((CurVal >> (i*8)) & 0xff);
+    Data[Offset + Idx] = (uint8_t)((CurVal >> (i * 8)) & 0xff);
   }
 }
 
@@ -142,7 +138,8 @@ getFixupKindInfo(MCFixupKind Kind) const {
 /// it should return an error.
 ///
 /// \return - True on success.
-bool Cpu0AsmBackend::writeNopData(raw_ostream &OS, uint64_t Count) const {
+bool Cpu0AsmBackend::writeNopData(raw_ostream &OS, uint64_t Count,
+                                  const MCSubtargetInfo *STI) const {
   return true;
 }
 

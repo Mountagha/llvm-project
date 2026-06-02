@@ -26,6 +26,7 @@
 #include "llvm/MC/MCInstrInfo.h"
 #include "llvm/MC/MCRegisterInfo.h"
 #include "llvm/MC/MCSubtargetInfo.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/raw_ostream.h"
 
 #define DEBUG_TYPE "mccodeemitter"
@@ -129,8 +130,7 @@ getMachineOpValue(const MCInst &MI, const MCOperand &MO,
   } else if (MO.isImm()) {
     return static_cast<unsigned>(MO.getImm());
   } else if (MO.isSFPImm()) {
-    return static_cast<unsigned>(APFloat(MO.getSFPImm())
-        .bitcastToAPInt().getHiBits(32).getLimitedValue());
+    return MO.getSFPImm();
   }
   // MO must be an Expr.
   assert(MO.isExpr());
