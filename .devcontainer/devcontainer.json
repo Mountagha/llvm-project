@@ -1,0 +1,5 @@
+{
+  "name": "C++ Development",
+  "image": "mcr.microsoft.com/devcontainers/cpp:latest",
+  "updateContentCommand": "sudo apt update && sudo apt install -y ninja-build"
+}
