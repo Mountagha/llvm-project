@@ -78,8 +78,8 @@ struct MatMulOpLowering
 
         auto fillOp = rewriter.create<linalg::FillOp>(
             loc,
-            zero,
-            out
+            ValueRange { zero },
+            ValueRange { out }
         );
 
         Value initializedOutput = fillOp.getResult(0);
@@ -225,8 +225,8 @@ struct ReduceSumOpLowering:
 
         auto fillOp = rewriter.create<linalg::FillOp>(
             loc,
-            zero,
-            out
+            ValueRange { zero },
+            ValueRange { out }
         );
 
         Value initializedOutput = fillOp.getResult(0);

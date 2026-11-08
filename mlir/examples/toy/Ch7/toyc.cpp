@@ -74,6 +74,7 @@ enum Action {
   DumpAST,
   DumpMLIR,
   DumpMLIRAffine,
+  DumpMLIRLinalg,
   DumpMLIRLLVM,
   DumpLLVMIR,
   RunJIT
@@ -85,6 +86,8 @@ static cl::opt<enum Action> emitAction(
     cl::values(clEnumValN(DumpMLIR, "mlir", "output the MLIR dump")),
     cl::values(clEnumValN(DumpMLIRAffine, "mlir-affine",
                           "output the MLIR dump after affine lowering")),
+    cl::values(clEnumValN(DumpMLIRLinalg, "mlir-linalg",
+                          "output the MLIR dump after linalg lowering")),
     cl::values(clEnumValN(DumpMLIRLLVM, "mlir-llvm",
                           "output the MLIR dump after llvm lowering")),
     cl::values(clEnumValN(DumpLLVMIR, "llvm", "output the LLVM IR dump")),
@@ -150,8 +153,15 @@ int loadAndProcessMLIR(mlir::MLIRContext &context,
     return 4;
 
   // Check to see what granularity of MLIR we are compiling to.
-  bool isLoweringToAffine = emitAction >= Action::DumpMLIRAffine;
-  bool isLoweringToLLVM = emitAction >= Action::DumpMLIRLLVM;
+  // bool isLoweringToAffine = emitAction >= Action::DumpMLIRAffine;
+  // bool isLoweringToLLVM = emitAction >= Action::DumpMLIRLLVM;
+  // bool isLoweringToLinalg = emitAction >= Action::DumpMLIRLinalg;
+
+  bool isLoweringToAffine = emitAction == Action::DumpMLIRAffine;
+  bool isLoweringToLinalg = emitAction == Action::DumpMLIRLinalg;
+  bool isLoweringToLLVM = emitAction == Action::DumpMLIRLLVM ||
+                        emitAction == Action::DumpLLVMIR ||
+                        emitAction == Action::RunJIT;
 
   if (enableOpt || isLoweringToAffine) {
     // Inline all functions into main and then delete them.
@@ -180,6 +190,11 @@ int loadAndProcessMLIR(mlir::MLIRContext &context,
       optPM.addPass(mlir::affine::createLoopFusionPass());
       optPM.addPass(mlir::affine::createAffineScalarReplacementPass());
     }
+  }
+
+  if (isLoweringToLinalg) {
+    // Partially lower to the linalg dialect.
+    pm.addPass(mlir::toy::createLowerToLinalgPass());
   }
 
   if (isLoweringToLLVM) {
@@ -303,6 +318,12 @@ int main(int argc, char **argv) {
   mlir::func::registerAllExtensions(registry);
   mlir::LLVM::registerInlinerInterface(registry);
 
+  // Insert the dialects used in the lowerings and test files.
+  registry.insert<mlir::arith::ArithDialect,
+                  mlir::tensor::TensorDialect,
+                  mlir::linalg::LinalgDialect,
+                  mlir::func::FuncDialect>();
+  
   mlir::MLIRContext context(registry);
   // Load our Dialect in this MLIR Context.
   context.getOrLoadDialect<mlir::toy::ToyDialect>();

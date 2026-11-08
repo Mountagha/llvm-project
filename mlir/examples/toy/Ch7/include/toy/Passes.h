@@ -29,6 +29,10 @@ std::unique_ptr<mlir::Pass> createLowerToAffinePass();
 /// well as `Affine` and `Std`, to the LLVM dialect for codegen.
 std::unique_ptr<mlir::Pass> createLowerToLLVMPass();
 
+/// Create a pass for lowering operations that have a perfect loop
+/// nest (e.g. matmul) into `Linalg` + `Arith`.
+std::unique_ptr<mlir::Pass> createLowerToLinalgPass();
+
 } // namespace toy
 } // namespace mlir
 

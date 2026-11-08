@@ -117,7 +117,8 @@ struct ShapeInferencePass
   /// shaped result.
   static bool returnsDynamicShape(Operation *op) {
     return llvm::any_of(op->getResultTypes(), [](Type resultType) {
-      return !llvm::isa<RankedTensorType>(resultType);
+      auto tensorType = llvm::dyn_cast<mlir::TensorType>(resultType);
+      return tensorType && !llvm::isa<RankedTensorType>(resultType);
     });
   }
 };
