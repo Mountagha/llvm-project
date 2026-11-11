@@ -33,6 +33,9 @@ std::unique_ptr<mlir::Pass> createLowerToLLVMPass();
 /// nest (e.g. matmul) into `Linalg` + `Arith`.
 std::unique_ptr<mlir::Pass> createLowerToLinalgPass();
 
+/// Create a pass for tiling linalg::matmul Op.
+std::unique_ptr<mlir::Pass> createMatMulTilingPass(ArrayRef<int64_t> tilesSizes);
+
 } // namespace toy
 } // namespace mlir
 
