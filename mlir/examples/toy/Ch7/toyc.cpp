@@ -75,10 +75,12 @@ enum Action {
   DumpMLIR,
   DumpMLIRAffine,
   DumpMLIRLinalg,
+  DumpMatMulTiled,
   DumpMLIRLLVM,
   DumpLLVMIR,
   RunJIT
 };
+
 } // namespace
 static cl::opt<enum Action> emitAction(
     "emit", cl::desc("Select the kind of output desired"),
@@ -88,6 +90,8 @@ static cl::opt<enum Action> emitAction(
                           "output the MLIR dump after affine lowering")),
     cl::values(clEnumValN(DumpMLIRLinalg, "mlir-linalg",
                           "output the MLIR dump after linalg lowering")),
+    cl::values(clEnumValN(DumpMatMulTiled, "toy-matmul-tile",
+                          "output the MLIR dump after matmul tiling")),
     cl::values(clEnumValN(DumpMLIRLLVM, "mlir-llvm",
                           "output the MLIR dump after llvm lowering")),
     cl::values(clEnumValN(DumpLLVMIR, "llvm", "output the LLVM IR dump")),
@@ -96,6 +100,10 @@ static cl::opt<enum Action> emitAction(
                    "JIT the code and run it by invoking the main function")));
 
 static cl::opt<bool> enableOpt("opt", cl::desc("Enable optimizations"));
+static cl::list<int64_t> tileSizes("tile-sizes",
+                                  cl::desc("Tile sizes for matmul tiling (comma-separated)"),
+                                  cl::CommaSeparated);
+
 
 /// Returns a Toy AST resulting from parsing the file or a nullptr on error.
 std::unique_ptr<toy::ModuleAST> parseInputFile(llvm::StringRef filename) {
@@ -195,6 +203,16 @@ int loadAndProcessMLIR(mlir::MLIRContext &context,
   if (isLoweringToLinalg) {
     // Partially lower to the linalg dialect.
     pm.addPass(mlir::toy::createLowerToLinalgPass());
+  }
+
+  bool isLoweringToMatMulTiled = emitAction == Action::DumpMatMulTiled;
+
+  if (isLoweringToMatMulTiled) {
+    // Partially lower to the linalg dialect.
+    pm.addPass(mlir::toy::createLowerToLinalgPass());
+
+    // Apply matmul tiling pass with user-provided tile sizes
+    pm.addPass(mlir::toy::createMatMulTilingPass(tileSizes));
   }
 
   if (isLoweringToLLVM) {

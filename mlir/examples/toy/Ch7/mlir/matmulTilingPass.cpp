@@ -17,8 +17,14 @@
 #include "mlir/Interfaces/TilingInterface.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
+#include "toy/Dialect.h"
+#include "toy/Passes.h"
 
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/Casting.h"
+
+using namespace mlir;
 
 namespace {
 
@@ -30,9 +36,9 @@ struct MatMulTilingPass
     // Constructor that accepts global CLI options
     MatMulTilingPass(ArrayRef<int64_t> userTilesSizes) {
         if (!userTilesSizes.empty()) {
-            customTilesSizes.assign(userTilesSizes.begin(), userTilesSizes.end());
+            customTileSizes.assign(userTilesSizes.begin(), userTilesSizes.end());
         } else {
-            customTilesSizes = {32, 32, 32}; // default fallback.
+            customTileSizes = {32, 32, 32}; // default fallback.
         }
     }
     void getDependentDialects(DialectRegistry &registry) const override {
@@ -41,32 +47,34 @@ struct MatMulTilingPass
 
     void runOnOperation() final;
 private:
-    SmallVector<int64_t, 3> customTilesSizes;
+    SmallVector<int64_t, 3> customTileSizes;
 };
 } // namespace
 
 void MatMulTilingPass::runOnOperation() {
     
-    func::FuncOp funcOP = getOperation();
+    func::FuncOp funcOp = getOperation();
     MLIRContext *context = &getContext();
     IRRewriter rewriter(context);
 
     // walk the function to find all linalg.matmul operations
-    SmallVector<linalg::MatMulOp> matmuls;
-    funcOp.walk([&](linalg::MatMulOp op) {
+    SmallVector<linalg::MatmulOp> matmuls;
+    funcOp.walk([&](linalg::MatmulOp op) {
         matmuls.push_back(op);
     });
 
 
     // Now apply tiling to each matmul found.
-    for (linalg::MatMulOp matmul : matmuls) {
+    for (linalg::MatmulOp matmul : matmuls) {
         rewriter.setInsertionPoint(matmul);
 
-        scf::SCFTilingOPtions options;
-        options.setTilesSizes(customTilesSizes);
+        scf::SCFTilingOptions options;
+        options.setTileSizes(
+            mlir::getAsIndexOpFoldResult(context, customTileSizes)
+        );
 
         // Cast to TilingInterface which linalg.matmul implements
-        TilingInterface tilingOp = cast<TilingInterface>(matmulOp.getOperation());
+        TilingInterface tilingOp = cast<TilingInterface>(matmul.getOperation());
 
         // Perform the tiling transformation using SCF loops.
         auto tiled = scf::tileUsingSCF(
@@ -81,12 +89,12 @@ void MatMulTilingPass::runOnOperation() {
         }
 
         // Replace the original matmul with the tiled results
-        rewriter.replaceOp(matmulOp, tiled->replacements);
+        rewriter.replaceOp(matmul, tiled->mergeResult.replacements);
     }
 
 }
 
-/// Create a pass for tiling linalg::MatMulOp.
-std::unique_ptr<Pass> mlir::toy::createMatMulTilingPass(ArrayRef<int64_t> tilesSizes) {
+/// Create a pass for tiling linalg::MatmulOp.
+std::unique_ptr<mlir::Pass> mlir::toy::createMatMulTilingPass(ArrayRef<int64_t> tilesSizes) {
     return std::make_unique<MatMulTilingPass>(tilesSizes);
 }
