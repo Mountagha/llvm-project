@@ -212,7 +212,8 @@ int loadAndProcessMLIR(mlir::MLIRContext &context,
     pm.addPass(mlir::toy::createLowerToLinalgPass());
 
     // Apply matmul tiling pass with user-provided tile sizes
-    pm.addPass(mlir::toy::createMatMulTilingPass(tileSizes));
+    mlir::OpPassManager &funcPM = pm.nest<mlir::func::FuncOp>();
+    funcPM.addPass(mlir::toy::createMatMulTilingPass(tileSizes));
   }
 
   if (isLoweringToLLVM) {

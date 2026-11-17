@@ -12,8 +12,11 @@
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
+#include "mlir/Dialect/Linalg/Transforms/TilingInterfaceImpl.h"
 #include "mlir/Interfaces/TilingInterface.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -42,7 +45,12 @@ struct MatMulTilingPass
         }
     }
     void getDependentDialects(DialectRegistry &registry) const override {
-        registry.insert<scf::SCFDialect>();
+        registry.insert<scf::SCFDialect,
+                        mlir::affine::AffineDialect,
+                        mlir::tensor::TensorDialect>();
+
+        // Register the TilingInterface implementation for Linalg ops.
+        mlir::linalg::registerTilingInterfaceExternalModels(registry);
     }
 
     void runOnOperation() final;

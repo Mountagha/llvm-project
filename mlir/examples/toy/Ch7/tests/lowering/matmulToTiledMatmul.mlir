@@ -27,4 +27,7 @@ module {
 // CHECK: scf.for
 // CHECK: scf.for
 // CHECK: tensor.extract_slice
+// CHECK: tensor<32x64xf64>
+// CHECK: tensor<64x32xf64>
 // CHECK: linalg.matmul
+// CHECK: tensor.insert_slice
