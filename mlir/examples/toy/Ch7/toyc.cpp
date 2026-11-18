@@ -75,7 +75,7 @@ enum Action {
   DumpMLIR,
   DumpMLIRAffine,
   DumpMLIRLinalg,
-  DumpMatMulTiled,
+  DumpLinalgTiled,
   DumpMLIRLLVM,
   DumpLLVMIR,
   RunJIT
@@ -90,7 +90,7 @@ static cl::opt<enum Action> emitAction(
                           "output the MLIR dump after affine lowering")),
     cl::values(clEnumValN(DumpMLIRLinalg, "mlir-linalg",
                           "output the MLIR dump after linalg lowering")),
-    cl::values(clEnumValN(DumpMatMulTiled, "toy-matmul-tile",
+    cl::values(clEnumValN(DumpLinalgTiled, "toy-linalg-tile",
                           "output the MLIR dump after matmul tiling")),
     cl::values(clEnumValN(DumpMLIRLLVM, "mlir-llvm",
                           "output the MLIR dump after llvm lowering")),
@@ -205,15 +205,15 @@ int loadAndProcessMLIR(mlir::MLIRContext &context,
     pm.addPass(mlir::toy::createLowerToLinalgPass());
   }
 
-  bool isLoweringToMatMulTiled = emitAction == Action::DumpMatMulTiled;
+  bool isLoweringToLinalgTiled = emitAction == Action::DumpLinalgTiled;
 
-  if (isLoweringToMatMulTiled) {
+  if (isLoweringToLinalgTiled) {
     // Partially lower to the linalg dialect.
     pm.addPass(mlir::toy::createLowerToLinalgPass());
 
     // Apply matmul tiling pass with user-provided tile sizes
     mlir::OpPassManager &funcPM = pm.nest<mlir::func::FuncOp>();
-    funcPM.addPass(mlir::toy::createMatMulTilingPass(tileSizes));
+    funcPM.addPass(mlir::toy::createLinalgTilingPass(tileSizes));
   }
 
   if (isLoweringToLLVM) {
