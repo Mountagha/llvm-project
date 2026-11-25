@@ -76,6 +76,8 @@ enum Action {
   DumpMLIRAffine,
   DumpMLIRLinalg,
   DumpLinalgTiled,
+  DumpLinalgPeeled,
+  DumpLinalgVectorized,
   DumpMLIRLLVM,
   DumpLLVMIR,
   RunJIT
@@ -91,7 +93,11 @@ static cl::opt<enum Action> emitAction(
     cl::values(clEnumValN(DumpMLIRLinalg, "mlir-linalg",
                           "output the MLIR dump after linalg lowering")),
     cl::values(clEnumValN(DumpLinalgTiled, "toy-linalg-tile",
-                          "output the MLIR dump after matmul tiling")),
+                          "output the MLIR dump after tiling linalg ops")),
+    cl::values(clEnumValN(DumpLinalgPeeled, "toy-linalg-peeling",
+                          "output the MLIR dump after peeling of loops for linalg")),
+    cl::values(clEnumValN(DumpLinalgVectorized,  "toy-linalg-vectorize",
+                          "output the MLIR dump after vectorizing linalg ops")),
     cl::values(clEnumValN(DumpMLIRLLVM, "mlir-llvm",
                           "output the MLIR dump after llvm lowering")),
     cl::values(clEnumValN(DumpLLVMIR, "llvm", "output the LLVM IR dump")),
@@ -160,6 +166,8 @@ int loadAndProcessMLIR(mlir::MLIRContext &context,
   if (mlir::failed(mlir::applyPassManagerCLOptions(pm)))
     return 4;
 
+  mlir::OpPassManager &optPM = pm.nest<mlir::toy::FuncOp>();
+  mlir::OpPassManager &funcPM = pm.nest<mlir::func::FuncOp>();
   // Check to see what granularity of MLIR we are compiling to.
   // bool isLoweringToAffine = emitAction >= Action::DumpMLIRAffine;
   // bool isLoweringToLLVM = emitAction >= Action::DumpMLIRLLVM;
@@ -167,6 +175,8 @@ int loadAndProcessMLIR(mlir::MLIRContext &context,
 
   bool isLoweringToAffine = emitAction == Action::DumpMLIRAffine;
   bool isLoweringToLinalg = emitAction == Action::DumpMLIRLinalg;
+  bool isLoopPeeling = emitAction == Action::DumpLinalgPeeled;
+  bool isVectorizing = emitAction == Action::DumpLinalgVectorized;
   bool isLoweringToLLVM = emitAction == Action::DumpMLIRLLVM ||
                         emitAction == Action::DumpLLVMIR ||
                         emitAction == Action::RunJIT;
@@ -177,7 +187,6 @@ int loadAndProcessMLIR(mlir::MLIRContext &context,
 
     // Now that there is only one function, we can infer the shapes of each of
     // the operations.
-    mlir::OpPassManager &optPM = pm.nest<mlir::toy::FuncOp>();
     optPM.addPass(mlir::createCanonicalizerPass());
     optPM.addPass(mlir::toy::createShapeInferencePass());
     optPM.addPass(mlir::createCanonicalizerPass());
@@ -189,7 +198,6 @@ int loadAndProcessMLIR(mlir::MLIRContext &context,
     pm.addPass(mlir::toy::createLowerToAffinePass());
 
     // Add a few cleanups post lowering.
-    mlir::OpPassManager &optPM = pm.nest<mlir::func::FuncOp>();
     optPM.addPass(mlir::createCanonicalizerPass());
     optPM.addPass(mlir::createCSEPass());
 
@@ -212,8 +220,52 @@ int loadAndProcessMLIR(mlir::MLIRContext &context,
     pm.addPass(mlir::toy::createLowerToLinalgPass());
 
     // Apply matmul tiling pass with user-provided tile sizes
-    mlir::OpPassManager &funcPM = pm.nest<mlir::func::FuncOp>();
     funcPM.addPass(mlir::toy::createLinalgTilingPass(tileSizes));
+  }
+
+  if (isLoopPeeling) {
+    // Make sure we have already lowered to linalg & tiled
+    pm.addPass(mlir::toy::createLowerToLinalgPass());
+
+    // Apply tiling pass with user-provided tile sizes
+    funcPM.addPass(mlir::toy::createLinalgTilingPass(tileSizes));
+    
+    // do some cleaning passes before
+    funcPM.addPass(mlir::createCanonicalizerPass());
+    funcPM.addPass(mlir::createCSEPass());
+
+    // now loop Peel
+    funcPM.addPass(mlir::toy::createLoopPeelingPass());
+
+    // do some cleaning passes after
+    funcPM.addPass(mlir::createCanonicalizerPass());
+    funcPM.addPass(mlir::createCSEPass());
+  }
+
+  if (isVectorizing) {
+    // Make sure we have already lowered to linalg & tiled
+    pm.addPass(mlir::toy::createLowerToLinalgPass());
+
+    // Apply tiling pass with user-provided tile sizes
+    funcPM.addPass(mlir::toy::createLinalgTilingPass(tileSizes));
+    
+    // do some cleaning passes before Peeling
+    funcPM.addPass(mlir::createCanonicalizerPass());
+    funcPM.addPass(mlir::createCSEPass());
+
+    // now loop Peel
+    funcPM.addPass(mlir::toy::createLoopPeelingPass());
+
+    // do some cleaning passes after Peeling
+    funcPM.addPass(mlir::createCanonicalizerPass());
+    funcPM.addPass(mlir::createCSEPass());
+
+    // now vectorize.
+    funcPM.addPass(mlir::toy::createVectorizePass());
+
+    // do some cleanings again.
+    funcPM.addPass(mlir::createCanonicalizerPass());
+    funcPM.addPass(mlir::createCSEPass());
   }
 
   if (isLoweringToLLVM) {

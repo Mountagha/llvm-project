@@ -1,4 +1,4 @@
-//====- LowerToLinalg.cpp - Partial lowering from Toy to Linalg+Arith --===//
+//====- linalgTilingPass.cpp - tiling linalg operations for better locality. --===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.

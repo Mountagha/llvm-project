@@ -27,6 +27,8 @@ add_toy_chapter(toyc-ch7
   mlir/LowerToAffineLoops.cpp
   mlir/LowerToLinalg.cpp
   mlir/linalgTilingPass.cpp
+  mlir/loopPeelingPass.cpp
+  mlir/vectorizePass.cpp
   mlir/LowerToLLVM.cpp
   mlir/ShapeInferencePass.cpp
   mlir/ToyCombine.cpp
