@@ -29,6 +29,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace mlir;
 
@@ -42,6 +43,13 @@ namespace {
             return "Apply vectorization to linalg suitable ops";
         }
 
+        void getDependentDialects(DialectRegistry &registry) const override {
+            registry.insert<
+                vector::VectorDialect,
+                arith::ArithDialect,
+                tensor::TensorDialect,
+                linalg::LinalgDialect>();
+        }
         void runOnOperation() final;
     };
 } // namespace.
@@ -50,7 +58,6 @@ void VectorizePass::runOnOperation() {
     func::FuncOp funcOP = getOperation();
     MLIRContext *ctx = &getContext();
     IRRewriter rewriter(ctx);
-
     // Collect ops suited for vectorization. For now matmul/map
 
     SmallVector<linalg::LinalgOp, 2> toVectorize;
@@ -68,12 +75,13 @@ void VectorizePass::runOnOperation() {
             );
         }
 
-        if (!isMatmul || !isMapLike)
+        if (!isMatmul && !isMapLike) {
             return;
+        }
         
         if (op.hasDynamicShape())
+            // maybe later add masked vectorization.
             return;
-
         toVectorize.push_back(op);
     });
 

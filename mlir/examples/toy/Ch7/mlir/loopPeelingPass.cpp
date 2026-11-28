@@ -56,7 +56,7 @@ void LoopPeelingPass::runOnOperation() {
     // loops should already be peeled before their
     // enclosing loop is transformed.
     SmallVector<scf::ForOp, 2> loopsToPeel;
-    funcOP.walk<WalkOrder::PreOrder>([&](scf::ForOp forOp) {
+    funcOP.walk<WalkOrder::PostOrder>([&](scf::ForOp forOp) {
         loopsToPeel.push_back(forOp);
     });
 
